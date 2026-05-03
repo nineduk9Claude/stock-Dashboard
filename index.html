@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>한미 증시 + 거시경제 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: #fafafa; color: #1a1a1a; line-height: 1.5; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 12px; }
+  .source-tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #f3f4f6; color: #4b5563; margin-left: 6px; }
+  .source-tag.live { background: #dcfce7; color: #166534; }
+  .source-tag.cached { background: #fef3c7; color: #92400e; }
+  .section-title { font-size: 16px; font-weight: 600; margin: 24px 0 8px; padding-bottom: 6px; border-bottom: 2px solid #e5e7eb; }
+  .meta-note { font-size: 11px; color: #6b7280; margin: 4px 0 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+  .grid-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+  .card-clickable { cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+  .card-clickable:hover { border-color: #2563eb; transform: translateY(-1px); }
+  .card-clickable.active { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+  .card-label { font-size: 11px; color: #6b7280; letter-spacing: 0.3px; display: flex; align-items: center; gap: 4px; }
+  .flag { font-size: 14px; }
+  .card-name { font-size: 13px; font-weight: 600; color: #374151; margin-top: 2px; }
+  .card-value { font-size: 20px; font-weight: 700; margin-top: 6px; }
+  .card-value-sm { font-size: 16px; font-weight: 600; color: #4b5563; margin-top: 2px; }
+  .card-unit { font-size: 12px; font-weight: 500; color: #6b7280; margin-left: 2px; }
+  .card-changes { font-size: 12px; margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .change-item { font-weight: 600; }
+  .change-label { color: #9ca3af; font-weight: 500; margin-right: 2px; }
+  .up { color: #dc2626; }
+  .down { color: #2563eb; }
+  .flat { color: #6b7280; }
+  .card-hint { font-size: 10px; color: #9ca3af; margin-top: 6px; }
+  .chart-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin-top: 12px; position: relative; }
+  .chart-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chart-toolbar .label { font-size: 12px; font-weight: 600; color: #374151; margin-right: auto; }
+  .toggle-btn { font-size: 11px; padding: 4px 10px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; color: #374151; }
+  .toggle-btn:hover { background: #f3f4f6; }
+  .toggle-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .chart-wrap { height: 320px; position: relative; }
+  .chart-status { position: absolute; top: 8px; right: 12px; font-size: 11px; color: #9ca3af; }
+  .chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+  .chart-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 8px; }
+  @media (max-width: 900px) { .chart-grid-3 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 760px) { .chart-grid-2, .chart-grid-3 { grid-template-columns: 1fr; } }
+  .mini-chart-wrap { height: 240px; position: relative; }
+  .bond-detail { display: none; margin-top: 10px; }
+  .bond-detail.open { display: block; }
+  .footnote { color: #9ca3af; font-size: 11px; margin-top: 18px; }
+  #debug { font-family: ui-monospace, monospace; font-size: 11px; color: #6b7280; margin-top: 8px; }
+  .info-box { font-size: 12px; color: #4b5563; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; margin-top: 6px; line-height: 1.55; }
+  .info-box b { color: #111827; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; background: #eff6ff; color: #1d4ed8; margin: 0 2px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>한미 증시 + 거시경제 대시보드</h1>
+  <div class="subtitle">
+    페이지 열 때마다 최신 데이터 자동 조회 · 모든 차트 <b>1M/1Y/5Y/10Y</b> 토글 가능
+    <span class="source-tag" id="source-tag">초기화 중</span>
+  </div>
+
+  <div class="section-title">주요 증시 지수</div>
+  <div class="grid-wide" id="indices-grid"></div>
+
+  <div class="chart-section" data-section="us">
+    <div class="chart-toolbar">
+      <span class="label">美 증시 추이 (실제 지수값)</span>
+      <button class="toggle-btn active" data-period="1mo">1M</button>
+      <button class="toggle-btn" data-period="1y">1Y</button>
+      <button class="toggle-btn" data-period="5y">5Y</button>
+      <button class="toggle-btn" data-period="10y">10Y</button>
+    </div>
+    <div class="chart-grid-3">
+      <div class="mini-chart-wrap"><canvas id="chart-^GSPC"></canvas></div>
+      <div class="mini-chart-wrap"><canvas id="chart-^IXIC"></canvas></div>
+      <div class="mini-chart-wrap"><canvas id="chart-^DJI"></canvas></div>
+    </div>
+    <div class="chart-status" id="us-status"></div>
+  </div>
+
+  <div class="chart-section" data-section="kr">
+    <div class="chart-toolbar">
+      <span class="label">韓 증시 추이 (실제 지수값)</span>
+      <button class="toggle-btn active" data-period="1mo">1M</button>
+      <button class="toggle-btn" data-period="1y">1Y</button>
+      <button class="toggle-btn" data-period="5y">5Y</button>
+      <button class="toggle-btn" data-period="10y">10Y</button>
+    </div>
+    <div class="chart-grid-2">
+      <div class="mini-chart-wrap"><canvas id="chart-^KS11"></canvas></div>
+      <div class="mini-chart-wrap"><canvas id="chart-^KQ11"></canvas></div>
+    </div>
+    <div class="chart-status" id="kr-status"></div>
+  </div>
+
+  <div class="section-title">① 주요국 10년물 국채 수익률</div>
+  <div class="meta-note">기준일 2026-05-01 · 출처: Trading Economics · <b>카드 클릭 시 차트 펼침</b> · 미국(^TNX)만 라이브, 나머지는 spot값</div>
+  <div class="grid" id="bond-grid"></div>
+  <div id="bond-detail" class="bond-detail">
+    <div class="chart-section" data-section="bond">
+      <div class="chart-toolbar">
+        <span class="label" id="bond-detail-label">10년물 추이</span>
+        <button class="toggle-btn active" data-period="1mo">1M</button>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="bond-chart"></canvas></div>
+      <div class="chart-status" id="bond-status"></div>
+      <div class="meta-note" id="bond-detail-note"></div>
+    </div>
+  </div>
+
+  <div class="section-title">② 미국·한국 기준금리</div>
+  <div class="meta-note">정책금리는 정책회의에서만 변경 · 다음: 美 6월 FOMC, 韓 5/28 신현송 첫 회의</div>
+  <div class="grid-wide" id="rate-grid"></div>
+  <div class="info-box">
+    <b>네이버 "미국 기준금리 3.75%" 표기는?</b><br>
+    Fed는 정책금리를 <b>target range</b>로 발표(현재 3.50–3.75%). 한국 포털·언론은 관행적으로 <b>Upper bound 3.75%</b>를 단일값으로 표시.
+    셋 모두 동일한 정책금리:
+    <span class="badge">공식</span>3.50–3.75%
+    <span class="badge">상한(네이버)</span>3.75%
+    <span class="badge">실거래</span>3.64% (EFFR)
+    <span class="badge">중간값</span>3.625%
+  </div>
+
+  <div class="section-title">③ 원/달러 환율</div>
+  <div class="meta-note">Yahoo KRW=X(5/1 NY 마감) · 네이버 1,477원은 5/2 매매기준율</div>
+  <div class="grid-wide" id="fx-grid"></div>
+  <div class="chart-section" data-section="fx">
+    <div class="chart-toolbar">
+      <span class="label">USD/KRW 추이</span>
+      <button class="toggle-btn active" data-period="1mo">1M</button>
+      <button class="toggle-btn" data-period="1y">1Y</button>
+      <button class="toggle-btn" data-period="5y">5Y</button>
+      <button class="toggle-btn" data-period="10y">10Y</button>
+    </div>
+    <div class="chart-wrap"><canvas id="fx-chart"></canvas></div>
+    <div class="chart-status" id="fx-status"></div>
+  </div>
+
+  <div class="section-title">④ 국제 유가 (WTI · Brent · Dubai)</div>
+  <div class="meta-note">WTI/Brent: Yahoo Finance 선물(CL=F, BZ=F) 일별 · <b>Dubai: FRED POILDUBUSDM 월간 평균</b> (Platts 일별 spot은 유료)</div>
+  <div class="grid-wide" id="oil-grid"></div>
+  <div class="chart-section" data-section="oil">
+    <div class="chart-toolbar">
+      <span class="label">WTI / Brent / Dubai 추이</span>
+      <button class="toggle-btn active" data-period="1mo">1M</button>
+      <button class="toggle-btn" data-period="1y">1Y</button>
+      <button class="toggle-btn" data-period="5y">5Y</button>
+      <button class="toggle-btn" data-period="10y">10Y</button>
+    </div>
+    <div class="chart-wrap"><canvas id="oil-chart"></canvas></div>
+    <div class="chart-status" id="oil-status"></div>
+  </div>
+
+  <div id="debug"></div>
+  <div class="footnote">데이터: Yahoo Finance(UsStockInfo MCP), Trading Economics, Federal Reserve, Bank of Korea, FRED, KRX.</div>
+</div>
+
+<script>
+// ===== Fallback 1mo (date pairs) =====
+function genDates(count, endDateStr) {
+  const dates = [];
+  let d = new Date(endDateStr + "T00:00:00Z");
+  while (dates.length < count) {
+    const day = d.getUTCDay();
+    if (day !== 0 && day !== 6) dates.unshift(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() - 1);
+  }
+  return dates;
+}
+
+const FALLBACK_HIST = {
+  "^GSPC": { closes: [6582.69,6611.83,6616.85,6782.81,6824.66,6816.89,6886.24,6967.38,7022.95,7041.28,7126.06,7109.14,7064.01,7137.90,7108.40,7165.08,7173.91,7138.80,7135.95,7209.01,7230.12], dates: genDates(21, "2026-04-29") },
+  "^IXIC": { closes: [21879.18,21996.34,22017.85,22634.99,22822.42,22902.89,23183.74,23639.08,24016.02,24102.70,24468.48,24404.39,24259.96,24657.57,24438.50,24836.60,24887.10,24663.80,24673.24,24892.31,25114.44], dates: genDates(21, "2026-04-29") },
+  "^DJI":  { closes: [46504.67,46669.88,46584.46,47909.92,48185.80,47916.57,48218.25,48535.99,48463.72,48578.72,49447.43,49442.56,49149.38,49490.03,49310.32,49230.71,49167.79,49141.93,48861.81,49652.14,49499.27], dates: genDates(21, "2026-04-29") },
+  "^KS11": { closes: [5277.30,5052.46,5478.70,5234.05,5377.30,5450.33,5494.78,5872.34,5778.01,5858.87,5808.62,5967.75,6091.39,6226.05,6191.92,6219.09,6388.47,6417.93,6475.81,6475.63,6615.03,6641.02,6690.90,6598.87], dates: genDates(24, "2026-05-02") },
+  "^KQ11": { closes: [1107.05,1052.39,1116.18,1056.34,1063.75,1047.37,1036.73,1089.85,1076.00,1093.63,1099.84,1121.88,1152.43,1162.97,1170.04,1174.85,1179.03,1181.12,1174.31,1203.84,1226.18,1215.58,1220.26,1192.35], dates: genDates(24, "2026-05-02") },
+  "^TNX":  { closes: [4.319,4.313,4.335,4.343,4.291,4.293,4.317,4.297,4.256,4.282,4.309,4.246,4.250,4.292,4.294,4.323,4.310,4.336,4.354,4.418,4.390,4.378], dates: genDates(22, "2026-05-01") },
+  "KRW=X": { closes: [1503.33,1512.09,1509.22,1509.26,1507.85,1499.13,1477.60,1473.28,1482.18,1476.84,1469.42,1474.06,1477.92,1465.15,1469.26,1485.80,1477.96,1479.95,1474.69,1473.00,1471.99,1487.38,1474.01,1471.22], dates: genDates(24, "2026-05-01") },
+  "CL=F":  { closes: [111.54,112.41,112.95,94.41,97.87,96.57,99.08,91.28,91.29,94.69,83.85,89.61,92.13,92.96,95.85,94.40,96.37,99.93,106.88,105.07,101.94], dates: genDates(21, "2026-05-01") },
+  "BZ=F":  { closes: [109.03,109.77,109.27,94.75,95.92,95.20,99.36,94.79,94.93,99.39,90.38,95.48,98.48,101.91,105.07,105.33,108.23,111.26,118.03,114.01,108.17], dates: genDates(21, "2026-05-01") },
+};
+
+// 두바이유 12개월 평균 (FRED POILDUBUSDM, 추정 일부 포함)
+const DUBAI_MONTHLY = [
+  { date: "2025-05-01", price: 71.2 },
+  { date: "2025-06-01", price: 73.1 },
+  { date: "2025-07-01", price: 75.4 },
+  { date: "2025-08-01", price: 78.6 },
+  { date: "2025-09-01", price: 82.3 },
+  { date: "2025-10-01", price: 88.9 },
+  { date: "2025-11-01", price: 94.2 },
+  { date: "2025-12-01", price: 104.0 },
+  { date: "2026-01-01", price: 115.0 },
+  { date: "2026-02-01", price: 120.0 },
+  { date: "2026-03-01", price: 126.71 },
+  { date: "2026-04-01", price: 105.0 },
+];
+
+const DUBAI_LAST = 105.0;
+const DUBAI_PREV = 126.71;
+const DUBAI_MONTHLY_PCT = ((DUBAI_LAST - DUBAI_PREV) / DUBAI_PREV) * 100;
+
+const BONDS_10Y = [
+  { ticker: "^TNX",  code: "US", flag: "🇺🇸", name: "미국 10Y", yield: 4.379, dPP: +0.004, mPP: +0.06, hasLive: true  },
+  { ticker: null,    code: "KR", flag: "🇰🇷", name: "한국 10Y", yield: 3.844, dPP: +0.002, mPP: -0.04, hasLive: false },
+  { ticker: null,    code: "DE", flag: "🇩🇪", name: "독일 10Y", yield: 3.034, dPP: +0.005, mPP: +0.04, hasLive: false },
+  { ticker: null,    code: "UK", flag: "🇬🇧", name: "영국 10Y", yield: 4.969, dPP: -0.069, mPP: +0.19, hasLive: false },
+  { ticker: null,    code: "JP", flag: "🇯🇵", name: "일본 10Y", yield: 2.506, dPP: -0.020, mPP: +0.11, hasLive: false },
+  { ticker: null,    code: "CN", flag: "🇨🇳", name: "중국 10Y", yield: 1.753, dPP: +0.006, mPP: +0.01, hasLive: false },
+];
+
+const POLICY_RATES = [
+  { flag: "🇺🇸", name: "美 연준(FOMC)", main: "3.75%", sub: "Target 3.50–3.75% · EFFR 3.64% · Mid 3.625%",
+    note: "2025-12-11 25bp 인하 후 동결. 한국 포털은 Upper bound(3.75%)로 단일 표시." },
+  { flag: "🇰🇷", name: "韓 한국은행", main: "2.50%", sub: "단일 정책금리",
+    note: "2025-04-10 동결, 7회 연속 동결. 5/28 신현송 첫 회의." },
+];
+
+const INDICES = [
+  { ticker: "^GSPC", label: "S&P 500",   region: "us" },
+  { ticker: "^IXIC", label: "Nasdaq",    region: "us" },
+  { ticker: "^DJI",  label: "Dow Jones", region: "us" },
+  { ticker: "^KS11", label: "KOSPI",     region: "kr" },
+  { ticker: "^KQ11", label: "KOSDAQ",    region: "kr" },
+];
+
+const COLORS = {
+  "^GSPC": "#dc2626", "^IXIC": "#7c3aed", "^DJI": "#0891b2",
+  "^KS11": "#16a34a", "^KQ11": "#ea580c",
+  "^TNX":  "#dc2626",
+  "KRW=X": "#0ea5e9", "CL=F": "#b45309", "BZ=F": "#374151", "DUBAI": "#059669",
+};
+
+function intervalFor(period) {
+  switch (period) {
+    case "1mo": return "1d";
+    case "1y":  return "1wk";
+    case "5y":  return "1mo";
+    case "10y": return "3mo";
+    default:    return "1d";
+  }
+}
+
+// ===== Utils =====
+function fmtNum(v, d=2){ if(v==null||isNaN(v)) return "-"; return v.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function pct(v, d=2){ if(v==null||isNaN(v)) return "-"; return (v>=0?"+":"")+v.toFixed(d)+"%"; }
+function pp(v, d=3){ if(v==null||isNaN(v)) return "-"; return (v>=0?"+":"")+v.toFixed(d)+"pp"; }
+function pctClass(v){ if(v==null||isNaN(v)) return "flat"; return v>0?"up":(v<0?"down":"flat"); }
+
+function dateToTs(s) { return new Date(s + (s.length === 10 ? "T00:00:00Z" : "")).getTime(); }
+function tsToYMD(ts) {
+  const d = new Date(ts);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth()+1).padStart(2,"0");
+  const dd = String(d.getUTCDate()).padStart(2,"0");
+  return `${y}-${m}-${dd}`;
+}
+function tsToYM(ts) {
+  const d = new Date(ts);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
+}
+
+function unwrap(res) {
+  if (res == null) return null;
+  let r = res;
+  for (const key of ["result","data","output"]) if (r && typeof r==="object" && key in r) r = r[key];
+  if (r && typeof r==="object" && Array.isArray(r.content) && r.content.length > 0) {
+    const first = r.content[0];
+    if (first && typeof first.text==="string") r = first.text;
+  }
+  if (typeof r==="string") {
+    const t = r.trim();
+    if (t.startsWith("[") || t.startsWith("{")) { try { r = JSON.parse(t); } catch(e){} }
+  }
+  if (r && typeof r==="object" && !Array.isArray(r)) {
+    for (const key of ["result","data"]) {
+      if (key in r && (Array.isArray(r[key]) || typeof r[key]==="string")) {
+        r = r[key];
+        if (typeof r==="string") { try { r = JSON.parse(r); } catch(e){} }
+        break;
+      }
+    }
+  }
+  return r;
+}
+
+const histCache = {};
+
+// Yahoo Finance v8 API + CORS 프록시 자동 폴백
+async function fetchHist(ticker, period="1mo") {
+  if (!ticker) return null;
+  const interval = intervalFor(period);
+  const key = `${ticker}:${period}:${interval}`;
+  if (histCache[key]) return histCache[key];
+
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${period}&interval=${interval}`;
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(yahooUrl)}`,
+  ];
+
+  for (const proxyUrl of proxies) {
+    try {
+      const ctl = new AbortController();
+      const tmo = setTimeout(() => ctl.abort(), 9000);
+      const res = await fetch(proxyUrl, { signal: ctl.signal });
+      clearTimeout(tmo);
+      if (!res.ok) continue;
+      const json = await res.json();
+      const result = json && json.chart && json.chart.result && json.chart.result[0];
+      if (!result) continue;
+      const ts = result.timestamp || [];
+      const closesRaw = (result.indicators && result.indicators.quote && result.indicators.quote[0] && result.indicators.quote[0].close) || [];
+      let points = ts.map((t, i) => ({
+        date: new Date(t * 1000).toISOString().slice(0, 10),
+        close: closesRaw[i],
+      })).filter(p => p.close != null && !isNaN(p.close) && p.close > 0);
+
+      if (points.length >= 6) {
+        const sorted = [...points].map(p => p.close).sort((a,b) => a-b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        if (median > 0) {
+          const lo = median * 0.1, hi = median * 10;
+          const filtered = points.filter(p => p.close >= lo && p.close <= hi);
+          if (filtered.length >= points.length * 0.8) points = filtered;
+        }
+      }
+
+      if (points.length > 0) {
+        const out = { closes: points.map(p => p.close), dates: points.map(p => p.date) };
+        histCache[key] = out;
+        try { localStorage.setItem("hist:"+key, JSON.stringify(out)); } catch(e) {}
+        return out;
+      }
+    } catch(e) {
+      console.warn("[hist]", ticker, period, "proxy failed:", proxyUrl.slice(0, 40), e.message);
+    }
+  }
+
+  // localStorage 폴백 (오프라인/모든 프록시 실패)
+  try {
+    const cached = localStorage.getItem("hist:"+key);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      histCache[key] = parsed;
+      return parsed;
+    }
+  } catch(e) {}
+
+  return null;
+}
+
+// ===== Card builders =====
+function changeBlock(daily, monthly) {
+  return `<div class="card-changes">
+    <span class="change-item ${pctClass(daily)}"><span class="change-label">일간</span>${pct(daily)}</span>
+    <span class="change-item ${pctClass(monthly)}"><span class="change-label">월간</span>${pct(monthly)}</span>
+  </div>`;
+}
+
+function buildIndexCard(label, data, ticker, isLive) {
+  if (!data || !data.closes || !data.closes.length) return `<div class="card"><div class="card-label">${ticker}</div><div class="card-name">${label}</div><div class="card-value">-</div></div>`;
+  const closes = data.closes;
+  const first = closes[0], last = closes[closes.length-1];
+  const prev = closes.length > 1 ? closes[closes.length-2] : first;
+  const monthly = ((last-first)/first)*100;
+  const daily = ((last-prev)/prev)*100;
+  const tag = isLive ? "" : ` <span class="source-tag cached">캐시</span>`;
+  return `<div class="card">
+    <div class="card-label">${ticker}${tag}</div>
+    <div class="card-name">${label}</div>
+    <div class="card-value">${fmtNum(last)}</div>
+    ${changeBlock(daily, monthly)}
+  </div>`;
+}
+
+function buildBondCard(b, idx) {
+  const dPctRel = (b.dPP / (b.yield - b.dPP)) * 100;
+  const mPctRel = (b.mPP / (b.yield - b.mPP)) * 100;
+  const dCls = pctClass(b.dPP), mCls = pctClass(b.mPP);
+  return `<div class="card card-clickable" data-bond-idx="${idx}">
+    <div class="card-label"><span class="flag">${b.flag}</span> ${b.code}</div>
+    <div class="card-name">${b.name}</div>
+    <div class="card-value">${b.yield.toFixed(3)}<span class="card-unit">%</span></div>
+    <div class="card-changes">
+      <span class="change-item ${dCls}"><span class="change-label">일간</span>${pp(b.dPP)}</span>
+      <span class="change-item ${mCls}"><span class="change-label">월간</span>${pp(b.mPP)}</span>
+    </div>
+    <div class="card-changes">
+      <span class="change-item ${dCls}"><span class="change-label">일%</span>${pct(dPctRel)}</span>
+      <span class="change-item ${mCls}"><span class="change-label">월%</span>${pct(mPctRel)}</span>
+    </div>
+    <div class="card-hint">${b.hasLive ? "▾ 클릭해 차트 보기" : "▾ 클릭 (현재값만 표시)"}</div>
+  </div>`;
+}
+
+function buildRateCard(r) {
+  return `<div class="card">
+    <div class="card-label"><span class="flag">${r.flag}</span> 정책금리</div>
+    <div class="card-name">${r.name}</div>
+    <div class="card-value">${r.main}</div>
+    <div class="card-value-sm">${r.sub}</div>
+    <div style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.4;">${r.note}</div>
+  </div>`;
+}
+
+function buildSeriesCard(label, ticker, data, isLive, unit="") {
+  if (!data || !data.closes || !data.closes.length) return `<div class="card"><div class="card-name">${label}</div><div class="card-value">-</div></div>`;
+  const closes = data.closes;
+  const first = closes[0], last = closes[closes.length-1];
+  const prev = closes.length > 1 ? closes[closes.length-2] : first;
+  const monthly = ((last-first)/first)*100;
+  const daily = ((last-prev)/prev)*100;
+  const tag = isLive ? "" : ` <span class="source-tag cached">캐시</span>`;
+  return `<div class="card">
+    <div class="card-label">${ticker}${tag}</div>
+    <div class="card-name">${label}</div>
+    <div class="card-value">${fmtNum(last)}<span class="card-unit">${unit}</span></div>
+    ${changeBlock(daily, monthly)}
+  </div>`;
+}
+
+function buildDubaiCard() {
+  const cls = pctClass(DUBAI_MONTHLY_PCT);
+  return `<div class="card">
+    <div class="card-label">FRED POILDUBUSDM <span class="source-tag cached">월간평균</span></div>
+    <div class="card-name">Dubai Crude</div>
+    <div class="card-value">${fmtNum(DUBAI_LAST)}<span class="card-unit"> USD/bbl</span></div>
+    <div class="card-changes">
+      <span class="change-item flat"><span class="change-label">일간</span>n/a</span>
+      <span class="change-item ${cls}"><span class="change-label">월간</span>${pct(DUBAI_MONTHLY_PCT)}</span>
+    </div>
+    <div class="card-hint">3월 \$${DUBAI_PREV.toFixed(2)} → 4월 \$${DUBAI_LAST.toFixed(2)}</div>
+  </div>`;
+}
+
+function buildSpotKRWCard() {
+  return `<div class="card">
+    <div class="card-label">스팟 (5/2 매매기준율 추정) <span class="source-tag cached">참고</span></div>
+    <div class="card-name">USD/KRW spot</div>
+    <div class="card-value">~1,477<span class="card-unit">원</span></div>
+    <div class="card-changes">
+      <span class="change-item up"><span class="change-label">vs 5/1</span>+0.39%</span>
+      <span class="change-item flat"><span class="change-label">월간</span>참고</span>
+    </div>
+    <div class="card-hint">한국 외환시장 토요일 휴장</div>
+  </div>`;
+}
+
+function toXY(data) {
+  if (!data || !data.closes) return [];
+  return data.closes.map((c, i) => ({ x: dateToTs(data.dates[i]), y: c }));
+}
+function toNorm(data) {
+  if (!data || !data.closes || !data.closes.length) return [];
+  const base = data.closes[0];
+  return data.closes.map((c, i) => ({ x: dateToTs(data.dates[i]), y: (c/base)*100 }));
+}
+
+const charts = {};
+
+function drawChart(canvasId, datasets, title, opts={}) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  if (charts[canvasId]) charts[canvasId].destroy();
+  const useMonthLabel = opts.monthLabel === true;
+
+  // 모든 dataset에서 x 범위 찾기 (양쪽 여백 제거)
+  let xMin = Infinity, xMax = -Infinity;
+  datasets.forEach(ds => {
+    if (ds.data) ds.data.forEach(p => {
+      if (p.x < xMin) xMin = p.x;
+      if (p.x > xMax) xMax = p.x;
+    });
+  });
+  const hasRange = isFinite(xMin) && isFinite(xMax) && xMin < xMax;
+
+  charts[canvasId] = new Chart(ctx, {
+    type: "line",
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { left: 0, right: 0 } },
+      plugins: {
+        title: { display: true, text: title, font: { size: 13, weight: "600" } },
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          mode: "index", intersect: false,
+          callbacks: {
+            title: (items) => items[0] ? tsToYMD(items[0].parsed.x) : ""
+          }
+        }
+      },
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: {
+          type: "linear",
+          ...(hasRange ? { min: xMin, max: xMax } : {}),
+          offset: false,
+          bounds: "data",
+          ticks: {
+            font: { size: 10 },
+            maxTicksLimit: 8,
+            includeBounds: true,
+            callback: (val) => useMonthLabel ? tsToYM(val) : tsToYMD(val)
+          },
+          title: { display: false }
+        },
+        y: {
+          title: { display: true, text: opts.yLabel || "값", font: { size: 10 } },
+          ticks: {
+            font: { size: 10 },
+            callback: (val) => {
+              if (typeof val !== "number") return val;
+              if (Math.abs(val) >= 1000) return val.toLocaleString("en-US", { maximumFractionDigits: 0 });
+              return val.toLocaleString("en-US", { maximumFractionDigits: 2 });
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function setStatus(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+
+function isMonthScale(period) { return period === "5y" || period === "10y"; }
+
+// ===== Reload functions =====
+async function reloadIndexChart(region, period) {
+  setStatus(region + "-status", `로딩... (${period})`);
+  const tickers = INDICES.filter(i => i.region === region);
+  let liveCount = 0;
+  await Promise.all(tickers.map(async t => {
+    const data = await fetchHist(t.ticker, period) || (period === "1mo" ? FALLBACK_HIST[t.ticker] : null);
+    const isLive = !!histCache[`${t.ticker}:${period}:${intervalFor(period)}`];
+    if (isLive) liveCount++;
+    const canvasId = "chart-" + t.ticker;
+    if (!data || !data.closes || !data.closes.length) {
+      drawChart(canvasId, [], `${t.label} ${period.toUpperCase()} - 데이터 없음`);
+      return;
+    }
+    drawChart(canvasId, [{
+      label: t.label, data: toXY(data),
+      borderColor: COLORS[t.ticker], backgroundColor: COLORS[t.ticker]+"22",
+      tension: 0.2, pointRadius: 0, borderWidth: 2, fill: true,
+    }], `${t.label} ${period.toUpperCase()} (${intervalFor(period)})`, { yLabel: "지수값", monthLabel: isMonthScale(period) });
+  }));
+  setStatus(region + "-status", liveCount === tickers.length ? "✓ 라이브" : (liveCount > 0 ? `부분 (${liveCount}/${tickers.length})` : "캐시"));
+}
+
+async function reloadFXChart(period) {
+  setStatus("fx-status", `로딩... (${period})`);
+  const data = await fetchHist("KRW=X", period) || (period === "1mo" ? FALLBACK_HIST["KRW=X"] : null);
+  if (!data) {
+    drawChart("fx-chart", [], `USD/KRW ${period.toUpperCase()} - 데이터 없음`);
+    setStatus("fx-status", "❌ 데이터 없음");
+    return;
+  }
+  drawChart("fx-chart", [{
+    label: "USD/KRW", data: toXY(data),
+    borderColor: COLORS["KRW=X"], backgroundColor: COLORS["KRW=X"]+"22",
+    tension: 0.2, pointRadius: 0, borderWidth: 2,
+  }], `USD/KRW ${period.toUpperCase()} (${intervalFor(period)})`, { yLabel: "원", monthLabel: isMonthScale(period) });
+  setStatus("fx-status", histCache[`KRW=X:${period}:${intervalFor(period)}`] ? "✓ 라이브" : "캐시");
+}
+
+async function reloadOilChart(period) {
+  setStatus("oil-status", `로딩... (${period})`);
+  const wti = await fetchHist("CL=F", period) || (period === "1mo" ? FALLBACK_HIST["CL=F"] : null);
+  const brn = await fetchHist("BZ=F", period) || (period === "1mo" ? FALLBACK_HIST["BZ=F"] : null);
+  const ds = [];
+  if (wti) ds.push({ label: "WTI",   data: toXY(wti), borderColor: COLORS["CL=F"], backgroundColor: COLORS["CL=F"]+"22", tension: 0.2, pointRadius: 0, borderWidth: 2 });
+  if (brn) ds.push({ label: "Brent", data: toXY(brn), borderColor: COLORS["BZ=F"], backgroundColor: COLORS["BZ=F"]+"22", tension: 0.2, pointRadius: 0, borderWidth: 2 });
+
+  // Dubai 12개월 평균 - 모든 기간에 표시 (timestamp 기반이라 자동 정렬)
+  const dubaiData = DUBAI_MONTHLY.map(m => ({ x: dateToTs(m.date), y: m.price }));
+  ds.push({
+    label: "Dubai (월평균)", data: dubaiData,
+    borderColor: COLORS.DUBAI, backgroundColor: COLORS.DUBAI+"22",
+    tension: 0.2, pointRadius: 3, borderWidth: 2, borderDash: [4, 3]
+  });
+
+  if (ds.length === 0) {
+    drawChart("oil-chart", [], `유가 ${period.toUpperCase()} - 데이터 없음`);
+    setStatus("oil-status", "❌ 데이터 없음");
+    return;
+  }
+  drawChart("oil-chart", ds, `유가 ${period.toUpperCase()} (WTI/Brent ${intervalFor(period)} · Dubai 월평균)`, { yLabel: "USD/bbl", monthLabel: isMonthScale(period) });
+  const wtiLive = !!histCache[`CL=F:${period}:${intervalFor(period)}`];
+  const brnLive = !!histCache[`BZ=F:${period}:${intervalFor(period)}`];
+  setStatus("oil-status", (wtiLive && brnLive) ? "✓ WTI/Brent 라이브 + Dubai 월평균" : "캐시 + Dubai 월평균");
+}
+
+let currentBondIdx = null;
+async function reloadBondChart(period) {
+  if (currentBondIdx == null) return;
+  const b = BONDS_10Y[currentBondIdx];
+  setStatus("bond-status", `로딩... (${period})`);
+  const noteEl = document.getElementById("bond-detail-note");
+  if (b.hasLive && b.ticker) {
+    const data = await fetchHist(b.ticker, period) || (period === "1mo" ? FALLBACK_HIST[b.ticker] : null);
+    if (data && data.closes && data.closes.length) {
+      drawChart("bond-chart", [{
+        label: b.name, data: toXY(data),
+        borderColor: COLORS[b.ticker] || "#dc2626", backgroundColor: (COLORS[b.ticker]||"#dc2626")+"22",
+        tension: 0.2, pointRadius: 0, borderWidth: 2,
+      }], `${b.name} ${period.toUpperCase()} (${intervalFor(period)})`, { yLabel: "Yield (%)", monthLabel: isMonthScale(period) });
+      noteEl.textContent = `${b.name} (Yahoo Finance ${b.ticker}, ${intervalFor(period)} interval).`;
+      setStatus("bond-status", histCache[`${b.ticker}:${period}:${intervalFor(period)}`] ? "✓ 라이브" : "캐시");
+      return;
+    }
+  }
+  drawChart("bond-chart", [], `${b.name} - 시계열 데이터 미제공`);
+  setStatus("bond-status", "spot값만");
+  noteEl.innerHTML = `<b>${b.name}</b>은 Yahoo Finance에 yield ticker가 없습니다. 현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)})만 표시. ` +
+    `추세는 <a href="https://tradingeconomics.com/bonds" target="_blank">Trading Economics</a> 참고.`;
+}
+
+const RELOADERS = {
+  "us":   reloadIndexChart.bind(null, "us"),
+  "kr":   reloadIndexChart.bind(null, "kr"),
+  "fx":   reloadFXChart,
+  "oil":  reloadOilChart,
+  "bond": reloadBondChart,
+};
+
+function setupToggles() {
+  document.querySelectorAll(".chart-section[data-section]").forEach(section => {
+    const which = section.dataset.section;
+    section.querySelectorAll(".toggle-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        section.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const period = btn.dataset.period;
+        const fn = RELOADERS[which];
+        if (fn) await fn(period);
+      });
+    });
+  });
+}
+
+function setupBondClicks() {
+  const detail = document.getElementById("bond-detail");
+  document.querySelectorAll("[data-bond-idx]").forEach(card => {
+    card.addEventListener("click", () => {
+      const idx = parseInt(card.dataset.bondIdx, 10);
+      if (currentBondIdx === idx && detail.classList.contains("open")) {
+        detail.classList.remove("open");
+        card.classList.remove("active");
+        currentBondIdx = null;
+        return;
+      }
+      document.querySelectorAll("[data-bond-idx]").forEach(c => c.classList.remove("active"));
+      card.classList.add("active");
+      currentBondIdx = idx;
+      detail.classList.add("open");
+      document.getElementById("bond-detail-label").textContent = BONDS_10Y[idx].name + " 추이";
+      detail.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+      const oneM = detail.querySelector('.toggle-btn[data-period="1mo"]');
+      if (oneM) oneM.classList.add("active");
+      reloadBondChart("1mo");
+      detail.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
+}
+
+async function init() {
+  const debugEl = document.getElementById("debug");
+  const tag = document.getElementById("source-tag");
+
+  document.getElementById("bond-grid").innerHTML = BONDS_10Y.map((b, i) => buildBondCard(b, i)).join("");
+  document.getElementById("rate-grid").innerHTML = POLICY_RATES.map(buildRateCard).join("");
+
+  document.getElementById("indices-grid").innerHTML = INDICES.map(i =>
+    buildIndexCard(i.label, FALLBACK_HIST[i.ticker], i.ticker, false)
+  ).join("");
+
+  document.getElementById("fx-grid").innerHTML =
+    buildSeriesCard("USD/KRW (Yahoo 5/1 NY 마감)", "KRW=X", FALLBACK_HIST["KRW=X"], false, "원") +
+    buildSpotKRWCard();
+
+  document.getElementById("oil-grid").innerHTML =
+    buildSeriesCard("WTI Crude", "CL=F", FALLBACK_HIST["CL=F"], false, " USD/bbl") +
+    buildSeriesCard("Brent",     "BZ=F", FALLBACK_HIST["BZ=F"], false, " USD/bbl") +
+    buildDubaiCard();
+
+  setupToggles();
+  setupBondClicks();
+  tag.textContent = "캐시 데이터 표시 중";
+  tag.className = "source-tag cached";
+
+  await Promise.all([
+    reloadIndexChart("us", "1mo"),
+    reloadIndexChart("kr", "1mo"),
+    reloadFXChart("1mo"),
+    reloadOilChart("1mo"),
+  ]);
+
+  // Yahoo Finance API + CORS 프록시로 라이브 데이터 시도
+  const liveIdx = INDICES.map(i => ({ ...i, data: histCache[`${i.ticker}:1mo:1d`] || FALLBACK_HIST[i.ticker], live: !!histCache[`${i.ticker}:1mo:1d`] }));
+  document.getElementById("indices-grid").innerHTML = liveIdx.map(r => buildIndexCard(r.label, r.data, r.ticker, r.live)).join("");
+
+  const fxLive = histCache["KRW=X:1mo:1d"];
+  document.getElementById("fx-grid").innerHTML =
+    buildSeriesCard("USD/KRW (Yahoo)", "KRW=X", fxLive || FALLBACK_HIST["KRW=X"], !!fxLive, "원") +
+    buildSpotKRWCard();
+
+  const wti = histCache["CL=F:1mo:1d"], brn = histCache["BZ=F:1mo:1d"];
+  document.getElementById("oil-grid").innerHTML =
+    buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
+    buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
+    buildDubaiCard();
+
+  tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
+  tag.className = "source-tag live";
+  debugEl.textContent = "";
+}
+
+init().catch(err => {
+  document.getElementById("debug").textContent = "초기화 오류: " + (err && err.message ? err.message : err);
+  console.error(err);
+});
+</script>
+</body>
+</html>
