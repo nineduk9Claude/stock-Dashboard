@@ -555,7 +555,7 @@ async function reloadIndexChart(region, period) {
       label: t.label, data: toXY(data),
       borderColor: COLORS[t.ticker], backgroundColor: COLORS[t.ticker]+"22",
       tension: 0.2, pointRadius: 0, borderWidth: 2, fill: true,
-    }], `${t.label} ${period.toUpperCase()} (${intervalFor(period)})`, { yLabel: "지수값", monthLabel: isMonthScale(period) });
+    }], `${t.label} ${period.toUpperCase()}`, { yLabel: "지수값", monthLabel: isMonthScale(period) });
   }));
   setStatus(region + "-status", liveCount === tickers.length ? "✓ 라이브" : (liveCount > 0 ? `부분 (${liveCount}/${tickers.length})` : "캐시"));
 }
@@ -572,7 +572,7 @@ async function reloadFXChart(period) {
     label: "USD/KRW", data: toXY(data),
     borderColor: COLORS["KRW=X"], backgroundColor: COLORS["KRW=X"]+"22",
     tension: 0.2, pointRadius: 0, borderWidth: 2,
-  }], `USD/KRW ${period.toUpperCase()} (${intervalFor(period)})`, { yLabel: "원", monthLabel: isMonthScale(period) });
+  }], `USD/KRW ${period.toUpperCase()}`, { yLabel: "원", monthLabel: isMonthScale(period) });
   setStatus("fx-status", histCache[`KRW=X:${period}:${intervalFor(period)}`] ? "✓ 라이브" : "캐시");
 }
 
@@ -597,7 +597,7 @@ async function reloadOilChart(period) {
     setStatus("oil-status", "❌ 데이터 없음");
     return;
   }
-  drawChart("oil-chart", ds, `유가 ${period.toUpperCase()} (WTI/Brent ${intervalFor(period)} · Dubai 월평균)`, { yLabel: "USD/bbl", monthLabel: isMonthScale(period) });
+  drawChart("oil-chart", ds, `유가 ${period.toUpperCase()} (Dubai 월평균 포함)`, { yLabel: "USD/bbl", monthLabel: isMonthScale(period) });
   const wtiLive = !!histCache[`CL=F:${period}:${intervalFor(period)}`];
   const brnLive = !!histCache[`BZ=F:${period}:${intervalFor(period)}`];
   setStatus("oil-status", (wtiLive && brnLive) ? "✓ WTI/Brent 라이브 + Dubai 월평균" : "캐시 + Dubai 월평균");
@@ -616,7 +616,7 @@ async function reloadBondChart(period) {
         label: b.name, data: toXY(data),
         borderColor: COLORS[b.ticker] || "#dc2626", backgroundColor: (COLORS[b.ticker]||"#dc2626")+"22",
         tension: 0.2, pointRadius: 0, borderWidth: 2,
-      }], `${b.name} ${period.toUpperCase()} (${intervalFor(period)})`, { yLabel: "Yield (%)", monthLabel: isMonthScale(period) });
+      }], `${b.name} ${period.toUpperCase()}`, { yLabel: "Yield (%)", monthLabel: isMonthScale(period) });
       noteEl.textContent = `${b.name} (Yahoo Finance ${b.ticker}, ${intervalFor(period)} interval).`;
       setStatus("bond-status", histCache[`${b.ticker}:${period}:${intervalFor(period)}`] ? "✓ 라이브" : "캐시");
       return;
