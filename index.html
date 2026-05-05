@@ -327,6 +327,23 @@ async function fetchHist(ticker, period="1mo") {
         close: closesRaw[i],
       })).filter(p => p.close != null && !isNaN(p.close) && p.close > 0);
 
+      // Yahoo는 historical 배열에 오늘(거래중) 시세를 안 넣고 meta.regularMarketPrice로 따로 줌
+      // 그래서 현재가가 빠진 채로 어제/그제 종가가 마지막으로 보이는 문제 발생.
+      // 1mo / 1y처럼 최근 기간 요청 시 현재가를 마지막 포인트로 추가.
+      const meta = result.meta || {};
+      const livePrice = meta.regularMarketPrice;
+      const liveTs = meta.regularMarketTime;
+      if (livePrice && !isNaN(livePrice) && livePrice > 0 && liveTs && (period === "1mo" || period === "1y")) {
+        const liveDate = new Date(liveTs * 1000).toISOString().slice(0, 10);
+        const lastDate = points.length > 0 ? points[points.length - 1].date : null;
+        if (!lastDate || liveDate > lastDate) {
+          points.push({ date: liveDate, close: livePrice });
+        } else if (lastDate === liveDate) {
+          // 같은 날짜면 마지막 포인트를 실시간으로 갱신
+          points[points.length - 1].close = livePrice;
+        }
+      }
+
       if (points.length >= 6) {
         const sorted = [...points].map(p => p.close).sort((a,b) => a-b);
         const median = sorted[Math.floor(sorted.length / 2)];
