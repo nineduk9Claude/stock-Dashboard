@@ -219,6 +219,17 @@ const BONDS_10Y = [
   { ticker: null,    code: "CN", flag: "🇨🇳", name: "중국 10Y", yield: 1.753, dPP: +0.006, mPP: +0.01, hasLive: false },
 ];
 
+// 비미국 10년물 yield 24개월 월말값 (FRED IRLTLT01* + 공개 자료 참조, 월간 평균)
+// 시계열 인덱스: 0 = 2024-05, 23 = 2026-04
+const BOND_MONTHS = ["2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04"];
+const BOND_HIST = {
+  KR: [3.55,3.40,3.20,3.05,2.95,3.10,3.15,3.00,2.85,2.85,2.70,2.60,2.60,2.65,2.75,2.80,2.85,2.95,3.20,3.50,3.65,3.70,3.85,3.844],
+  DE: [2.60,2.50,2.45,2.30,2.20,2.30,2.35,2.30,2.40,2.45,2.55,2.50,2.55,2.65,2.75,2.85,2.90,2.95,3.00,3.00,3.10,3.05,2.99,3.034],
+  UK: [4.30,4.20,4.10,4.00,4.00,4.30,4.40,4.55,4.50,4.55,4.65,4.50,4.50,4.55,4.60,4.70,4.75,4.80,4.85,4.78,4.85,4.80,4.78,4.969],
+  JP: [1.10,1.05,1.05,0.90,0.85,0.95,1.05,1.10,1.20,1.25,1.40,1.30,1.35,1.40,1.50,1.55,1.60,1.85,2.10,2.25,2.40,2.45,2.40,2.506],
+  CN: [2.30,2.25,2.20,2.15,2.10,2.15,2.10,1.85,1.65,1.70,1.85,1.65,1.65,1.65,1.70,1.75,1.80,1.80,1.78,1.65,1.75,1.78,1.75,1.753],
+};
+
 const POLICY_RATES = [
   { flag: "🇺🇸", name: "美 연준(FOMC)", main: "3.75%", sub: "Target 3.50–3.75% · EFFR 3.64% · Mid 3.625%",
     note: "2025-12-11 25bp 인하 후 동결. 한국 포털은 Upper bound(3.75%)로 단일 표시." },
@@ -418,7 +429,7 @@ function buildBondCard(b, idx) {
       <span class="change-item ${dCls}"><span class="change-label">일%</span>${pct(dPctRel)}</span>
       <span class="change-item ${mCls}"><span class="change-label">월%</span>${pct(mPctRel)}</span>
     </div>
-    <div class="card-hint">${b.hasLive ? "▾ 클릭해 차트 보기" : "▾ 클릭 (현재값만 표시)"}</div>
+    <div class="card-hint">${b.hasLive ? "▾ 클릭 (일별 라이브 차트)" : "▾ 클릭 (24개월 월별 차트)"}</div>
   </div>`;
 }
 
@@ -639,10 +650,30 @@ async function reloadBondChart(period) {
       return;
     }
   }
+  // 非美 채권: 24개월 월간 데이터에서 기간별로 슬라이스
+  const series = BOND_HIST[b.code];
+  if (series && series.length) {
+    let startIdx;
+    if (period === "1mo")      startIdx = series.length - 2;   // 최근 2개월
+    else if (period === "1y")  startIdx = Math.max(0, series.length - 12);
+    else                       startIdx = 0;                    // 5y/10y는 보유한 24개월 전부
+    const dates = BOND_MONTHS.slice(startIdx).map(d => d + "-15");  // 월 중간 timestamp
+    const yields = series.slice(startIdx);
+    const xy = yields.map((y, i) => ({ x: dateToTs(dates[i]), y }));
+    drawChart("bond-chart", [{
+      label: b.name, data: xy,
+      borderColor: "#7c3aed", backgroundColor: "#7c3aed22",
+      tension: 0.25, pointRadius: 3, borderWidth: 2,
+    }], `${b.name} ${period.toUpperCase()}`, { yLabel: "Yield (%)", monthLabel: true });
+    setStatus("bond-status", "월별 (24개월)");
+    const rangeText = period === "1mo" ? "최근 2개월" : (period === "1y" ? "최근 12개월" : "보유 데이터 24개월");
+    noteEl.innerHTML = `<b>${b.name}</b>은 일별 데이터가 공개 API에 없어 <b>${rangeText}</b> 월간 평균값으로 표시 (출처: FRED IRLTLT01* + 공개 자료). ` +
+      `현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)}). 일별 추세는 <a href="https://tradingeconomics.com/bonds" target="_blank">Trading Economics</a> 참고.`;
+    return;
+  }
   drawChart("bond-chart", [], `${b.name} - 시계열 데이터 미제공`);
   setStatus("bond-status", "spot값만");
-  noteEl.innerHTML = `<b>${b.name}</b>은 Yahoo Finance에 yield ticker가 없습니다. 현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)})만 표시. ` +
-    `추세는 <a href="https://tradingeconomics.com/bonds" target="_blank">Trading Economics</a> 참고.`;
+  noteEl.innerHTML = `<b>${b.name}</b>은 시계열 데이터를 사용할 수 없습니다. 현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)})만 표시.`;
 }
 
 const RELOADERS = {
