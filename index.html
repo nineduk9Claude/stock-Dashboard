@@ -644,31 +644,47 @@ async function reloadBondChart(period) {
         label: b.name, data: toXY(data),
         borderColor: COLORS[b.ticker] || "#dc2626", backgroundColor: (COLORS[b.ticker]||"#dc2626")+"22",
         tension: 0.2, pointRadius: 0, borderWidth: 2,
-      }], `${b.name} ${period.toUpperCase()}`, { yLabel: "Yield (%)", monthLabel: isMonthScale(period) });
+      }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: isMonthScale(period) });
       noteEl.textContent = `${b.name} (Yahoo Finance ${b.ticker}, ${intervalFor(period)} interval).`;
       setStatus("bond-status", histCache[`${b.ticker}:${period}:${intervalFor(period)}`] ? "✓ 라이브" : "캐시");
       return;
     }
   }
-  // 非美 채권: 24개월 월간 데이터에서 기간별로 슬라이스
+  // 非美 채권: 월간 평균값을 주별로 선형 내삽해서 1M 가독성 개선
   const series = BOND_HIST[b.code];
   if (series && series.length) {
-    let startIdx;
-    if (period === "1mo")      startIdx = series.length - 2;   // 최근 2개월
-    else if (period === "1y")  startIdx = Math.max(0, series.length - 12);
-    else                       startIdx = 0;                    // 5y/10y는 보유한 24개월 전부
-    const dates = BOND_MONTHS.slice(startIdx).map(d => d + "-15");  // 월 중간 timestamp
-    const yields = series.slice(startIdx);
-    const xy = yields.map((y, i) => ({ x: dateToTs(dates[i]), y }));
+    // 4주/월 간격으로 내삽 → 24개월 × 4 = 96개 주별 포인트
+    const weekly = [];
+    for (let i = 0; i < BOND_MONTHS.length - 1; i++) {
+      const start = new Date(BOND_MONTHS[i] + "-15T00:00:00Z").getTime();
+      const end   = new Date(BOND_MONTHS[i+1] + "-15T00:00:00Z").getTime();
+      const sY = series[i], eY = series[i+1];
+      for (let w = 0; w < 4; w++) {
+        const t = w / 4;
+        weekly.push({ x: start + (end - start) * t, y: sY + (eY - sY) * t });
+      }
+    }
+    // 마지막 월 포인트 추가
+    weekly.push({
+      x: new Date(BOND_MONTHS[BOND_MONTHS.length-1] + "-15T00:00:00Z").getTime(),
+      y: series[series.length - 1],
+    });
+
+    let sliced;
+    if (period === "1mo")      sliced = weekly.slice(-9);   // 최근 ~2개월
+    else if (period === "1y")  sliced = weekly.slice(-52);
+    else                       sliced = weekly;              // 5y/10y는 보유 ~2년 전부
+
+    const useDayLabel = period === "1mo" || period === "1y";
     drawChart("bond-chart", [{
-      label: b.name, data: xy,
+      label: b.name, data: sliced,
       borderColor: "#7c3aed", backgroundColor: "#7c3aed22",
-      tension: 0.25, pointRadius: 3, borderWidth: 2,
-    }], `${b.name} ${period.toUpperCase()}`, { yLabel: "Yield (%)", monthLabel: true });
-    setStatus("bond-status", "월별 (24개월)");
+      tension: 0.35, pointRadius: 0, borderWidth: 2, fill: true,
+    }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: !useDayLabel });
+    setStatus("bond-status", "월간 → 주별 내삽");
     const rangeText = period === "1mo" ? "최근 2개월" : (period === "1y" ? "최근 12개월" : "보유 데이터 24개월");
-    noteEl.innerHTML = `<b>${b.name}</b>은 일별 데이터가 공개 API에 없어 <b>${rangeText}</b> 월간 평균값으로 표시 (출처: FRED IRLTLT01* + 공개 자료). ` +
-      `현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)}). 일별 추세는 <a href="https://tradingeconomics.com/bonds" target="_blank">Trading Economics</a> 참고.`;
+    noteEl.innerHTML = `<b>${b.name}</b>은 일별 데이터가 공개 API에 없어 <b>${rangeText}</b> 월간 평균값을 주별로 선형 내삽한 추정 추세 (출처: FRED IRLTLT01* + 공개 자료). ` +
+      `현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)}). 일별 정확값은 <a href="https://tradingeconomics.com/bonds" target="_blank">Trading Economics</a> 참고.`;
     return;
   }
   drawChart("bond-chart", [], `${b.name} - 시계열 데이터 미제공`);
@@ -714,7 +730,7 @@ function setupBondClicks() {
       card.classList.add("active");
       currentBondIdx = idx;
       detail.classList.add("open");
-      document.getElementById("bond-detail-label").textContent = BONDS_10Y[idx].name + " 추이";
+      document.getElementById("bond-detail-label").textContent = BONDS_10Y[idx].name;
       detail.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
       const oneM = detail.querySelector('.toggle-btn[data-period="1mo"]');
       if (oneM) oneM.classList.add("active");
@@ -767,19 +783,4 @@ async function init() {
 
   const wti = histCache["CL=F:1mo:1d"], brn = histCache["BZ=F:1mo:1d"];
   document.getElementById("oil-grid").innerHTML =
-    buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
-    buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
-    buildDubaiCard();
-
-  tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
-  tag.className = "source-tag live";
-  debugEl.textContent = "";
-}
-
-init().catch(err => {
-  document.getElementById("debug").textContent = "초기화 오류: " + (err && err.message ? err.message : err);
-  console.error(err);
-});
-</script>
-</body>
-</html>
+    b
