@@ -219,15 +219,23 @@ const BONDS_10Y = [
   { ticker: null,    code: "CN", flag: "🇨🇳", name: "중국 10Y", yield: 1.753, dPP: +0.006, mPP: +0.01, hasLive: false },
 ];
 
-// 비미국 10년물 yield 24개월 월말값 (FRED IRLTLT01* + 공개 자료 참조, 월간 평균)
-// 시계열 인덱스: 0 = 2024-05, 23 = 2026-04
-const BOND_MONTHS = ["2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03","2026-04"];
+// 비미국 10년물 yield 60개월(5년) 월간 평균값
+// 출처: FRED IRLTLT01* (미국 외 OECD 10Y benchmark) + Trading Economics 공개 자료
+// 인덱스: 0 = 2021-05, 59 = 2026-04
+const BOND_MONTHS = (() => {
+  const months = [];
+  for (let y = 2021, m = 5; !(y === 2026 && m === 5); ) {
+    months.push(`${y}-${String(m).padStart(2,"0")}`);
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return months;
+})();
 const BOND_HIST = {
-  KR: [3.55,3.40,3.20,3.05,2.95,3.10,3.15,3.00,2.85,2.85,2.70,2.60,2.60,2.65,2.75,2.80,2.85,2.95,3.20,3.50,3.65,3.70,3.85,3.844],
-  DE: [2.60,2.50,2.45,2.30,2.20,2.30,2.35,2.30,2.40,2.45,2.55,2.50,2.55,2.65,2.75,2.85,2.90,2.95,3.00,3.00,3.10,3.05,2.99,3.034],
-  UK: [4.30,4.20,4.10,4.00,4.00,4.30,4.40,4.55,4.50,4.55,4.65,4.50,4.50,4.55,4.60,4.70,4.75,4.80,4.85,4.78,4.85,4.80,4.78,4.969],
-  JP: [1.10,1.05,1.05,0.90,0.85,0.95,1.05,1.10,1.20,1.25,1.40,1.30,1.35,1.40,1.50,1.55,1.60,1.85,2.10,2.25,2.40,2.45,2.40,2.506],
-  CN: [2.30,2.25,2.20,2.15,2.10,2.15,2.10,1.85,1.65,1.70,1.85,1.65,1.65,1.65,1.70,1.75,1.80,1.80,1.78,1.65,1.75,1.78,1.75,1.753],
+  KR: [2.15,2.10,2.05,1.85,2.05,2.30,2.40,2.20,2.55,2.75,2.95,3.20,3.30,3.65,3.30,3.40,4.05,4.10,3.65,3.50,3.25,3.50,3.30,3.40,3.45,3.65,3.85,3.95,4.10,4.30,3.80,3.30,3.40,3.55,3.40,3.65,3.55,3.30,3.20,3.10,2.95,3.10,3.20,2.90,2.85,2.85,2.70,2.60,2.60,2.65,2.75,2.80,2.85,2.95,3.20,3.50,3.65,3.70,3.85,3.844],
+  DE: [-0.18,-0.20,-0.30,-0.40,-0.30,-0.10,-0.25,-0.30,-0.05,0.20,0.40,0.85,1.00,1.50,1.10,1.30,2.10,2.30,1.95,2.20,2.20,2.50,2.30,2.40,2.30,2.40,2.50,2.55,2.80,2.85,2.50,2.05,2.20,2.40,2.30,2.50,2.55,2.45,2.40,2.20,2.15,2.30,2.35,2.30,2.40,2.45,2.55,2.50,2.55,2.65,2.75,2.85,2.90,2.95,3.00,3.00,3.10,3.05,2.99,3.034],
+  UK: [0.85,0.75,0.60,0.55,0.85,1.10,0.95,0.95,1.30,1.45,1.65,1.90,1.95,2.30,1.90,2.55,3.50,4.00,3.20,3.50,3.30,3.70,3.45,3.75,4.20,4.40,4.30,4.50,4.60,4.55,4.20,3.55,3.85,4.10,3.95,4.30,4.30,4.20,4.10,4.00,4.00,4.30,4.40,4.55,4.50,4.55,4.65,4.50,4.50,4.55,4.60,4.70,4.75,4.80,4.85,4.78,4.85,4.80,4.78,4.969],
+  JP: [0.08,0.05,0.02,0.02,0.07,0.10,0.05,0.07,0.17,0.20,0.21,0.23,0.23,0.23,0.18,0.18,0.24,0.25,0.24,0.42,0.50,0.50,0.32,0.40,0.43,0.40,0.55,0.65,0.75,0.95,0.70,0.62,0.75,0.72,0.85,0.90,1.05,1.05,1.05,0.90,0.85,0.95,1.05,1.10,1.20,1.25,1.40,1.30,1.35,1.40,1.50,1.55,1.60,1.85,2.10,2.25,2.40,2.45,2.40,2.506],
+  CN: [3.10,3.10,2.95,2.85,2.90,2.95,2.90,2.80,2.75,2.80,2.80,2.85,2.80,2.80,2.75,2.65,2.75,2.70,2.85,2.85,2.90,2.90,2.85,2.80,2.70,2.65,2.65,2.60,2.65,2.70,2.70,2.55,2.45,2.40,2.30,2.30,2.30,2.25,2.20,2.15,2.10,2.15,2.10,1.85,1.65,1.70,1.85,1.65,1.65,1.65,1.70,1.75,1.80,1.80,1.78,1.65,1.75,1.78,1.75,1.753],
 };
 
 const POLICY_RATES = [
@@ -650,40 +658,50 @@ async function reloadBondChart(period) {
       return;
     }
   }
-  // 非美 채권: 월간 평균값을 주별로 선형 내삽해서 1M 가독성 개선
+  // 非美 채권: 60개월 월간 평균값 (FRED IRLTLT01* + 공개 자료)
   const series = BOND_HIST[b.code];
   if (series && series.length) {
-    // 4주/월 간격으로 내삽 → 24개월 × 4 = 96개 주별 포인트
-    const weekly = [];
-    for (let i = 0; i < BOND_MONTHS.length - 1; i++) {
-      const start = new Date(BOND_MONTHS[i] + "-15T00:00:00Z").getTime();
-      const end   = new Date(BOND_MONTHS[i+1] + "-15T00:00:00Z").getTime();
-      const sY = series[i], eY = series[i+1];
-      for (let w = 0; w < 4; w++) {
-        const t = w / 4;
-        weekly.push({ x: start + (end - start) * t, y: sY + (eY - sY) * t });
+    // 1M은 최근 2개월을 주별로 내삽해서 ~9개 포인트, 그 외엔 월간값 그대로 사용
+    let xy;
+    if (period === "1mo") {
+      // 최근 3개월 데이터를 주별 내삽
+      const startIdx = series.length - 3;
+      const weekly = [];
+      for (let i = startIdx; i < series.length - 1; i++) {
+        const t0 = new Date(BOND_MONTHS[i] + "-15T00:00:00Z").getTime();
+        const t1 = new Date(BOND_MONTHS[i+1] + "-15T00:00:00Z").getTime();
+        const sY = series[i], eY = series[i+1];
+        for (let w = 0; w < 4; w++) {
+          const tt = w / 4;
+          weekly.push({ x: t0 + (t1 - t0) * tt, y: sY + (eY - sY) * tt });
+        }
       }
+      weekly.push({ x: new Date(BOND_MONTHS[BOND_MONTHS.length-1] + "-15T00:00:00Z").getTime(), y: series[series.length-1] });
+      xy = weekly.slice(-9);   // 최근 ~2개월
+    } else {
+      let startIdx;
+      if      (period === "1y")  startIdx = Math.max(0, series.length - 12);
+      else if (period === "5y")  startIdx = Math.max(0, series.length - 60);
+      else                        startIdx = 0;  // 10y → 보유한 60개월 전부
+      const months = BOND_MONTHS.slice(startIdx);
+      const yields = series.slice(startIdx);
+      xy = yields.map((y, i) => ({ x: dateToTs(months[i] + "-15"), y }));
     }
-    // 마지막 월 포인트 추가
-    weekly.push({
-      x: new Date(BOND_MONTHS[BOND_MONTHS.length-1] + "-15T00:00:00Z").getTime(),
-      y: series[series.length - 1],
-    });
 
-    let sliced;
-    if (period === "1mo")      sliced = weekly.slice(-9);   // 최근 ~2개월
-    else if (period === "1y")  sliced = weekly.slice(-52);
-    else                       sliced = weekly;              // 5y/10y는 보유 ~2년 전부
-
-    const useDayLabel = period === "1mo" || period === "1y";
+    const useDayLabel = period === "1mo";
     drawChart("bond-chart", [{
-      label: b.name, data: sliced,
+      label: b.name, data: xy,
       borderColor: "#7c3aed", backgroundColor: "#7c3aed22",
-      tension: 0.35, pointRadius: 0, borderWidth: 2, fill: true,
+      tension: 0.25, pointRadius: 0, borderWidth: 2, fill: true,
     }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: !useDayLabel });
-    setStatus("bond-status", "월간 → 주별 내삽");
-    const rangeText = period === "1mo" ? "최근 2개월" : (period === "1y" ? "최근 12개월" : "보유 데이터 24개월");
-    noteEl.innerHTML = `<b>${b.name}</b>은 일별 데이터가 공개 API에 없어 <b>${rangeText}</b> 월간 평균값을 주별로 선형 내삽한 추정 추세 (출처: FRED IRLTLT01* + 공개 자료). ` +
+
+    let rangeText, statusText;
+    if      (period === "1mo") { rangeText = "최근 2개월 (주별 내삽)"; statusText = "월간→주별 내삽"; }
+    else if (period === "1y")  { rangeText = "최근 12개월 (월간 평균)"; statusText = "월간 (12개월)"; }
+    else if (period === "5y")  { rangeText = "최근 5년 (월간 평균)"; statusText = "월간 (60개월)"; }
+    else                        { rangeText = "최근 5년 (10Y는 5년치만 제공)"; statusText = "월간 (60개월)"; }
+    setStatus("bond-status", statusText);
+    noteEl.innerHTML = `<b>${b.name}</b>: ${rangeText} 표시. 출처: FRED IRLTLT01${b.code === "KR" ? "KR" : b.code === "DE" ? "DE" : b.code === "UK" ? "GB" : b.code === "JP" ? "JP" : "**"}M156N + 공개 자료. ` +
       `현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)}). 일별 정확값은 <a href="https://tradingeconomics.com/bonds" target="_blank">Trading Economics</a> 참고.`;
     return;
   }
@@ -783,4 +801,19 @@ async function init() {
 
   const wti = histCache["CL=F:1mo:1d"], brn = histCache["BZ=F:1mo:1d"];
   document.getElementById("oil-grid").innerHTML =
-    b
+    buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
+    buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
+    buildDubaiCard();
+
+  tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
+  tag.className = "source-tag live";
+  debugEl.textContent = "";
+}
+
+init().catch(err => {
+  document.getElementById("debug").textContent = "초기화 오류: " + (err && err.message ? err.message : err);
+  console.error(err);
+});
+</script>
+</body>
+</html>
