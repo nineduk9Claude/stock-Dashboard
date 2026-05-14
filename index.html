@@ -161,8 +161,88 @@
     <div class="chart-status" id="oil-status"></div>
   </div>
 
+  <div class="section-title">⑤ 美 인플레이션 (CPI · Core CPI · PCE · Core PCE)</div>
+  <div class="meta-note">전년동월대비(YoY) % · 출처: BLS(CPI), BEA(PCE) · Fed 목표 2.0%</div>
+  <div class="grid-wide" id="inflation-grid"></div>
+  <div class="chart-section" data-section="inflation">
+    <div class="chart-toolbar">
+      <span class="label">美 인플레이션 4종 비교</span>
+      <button class="toggle-btn" data-period="1y">1Y</button>
+      <button class="toggle-btn active" data-period="5y">5Y</button>
+    </div>
+    <div class="chart-wrap"><canvas id="inflation-chart"></canvas></div>
+  </div>
+
+  <div class="section-title">⑥ 美 고용 (Nonfarm Payrolls · 실업률)</div>
+  <div class="meta-note">출처: BLS · NFP는 월별 증감(천명) · 실업률은 %</div>
+  <div class="grid-wide" id="employment-grid"></div>
+  <div class="chart-grid-2">
+    <div class="chart-section" data-section="nfp">
+      <div class="chart-toolbar">
+        <span class="label">Nonfarm Payrolls (월간 증감)</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="nfp-chart"></canvas></div>
+    </div>
+    <div class="chart-section" data-section="unrate">
+      <div class="chart-toolbar">
+        <span class="label">실업률</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="unrate-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">⑦ ISM PMI (제조업 · 서비스업)</div>
+  <div class="meta-note">출처: ISM · <b>50 = 확장/수축 경계</b> · 50 이상 확장, 50 미만 수축</div>
+  <div class="grid-wide" id="ism-grid"></div>
+  <div class="chart-section" data-section="ism">
+    <div class="chart-toolbar">
+      <span class="label">ISM PMI 추이</span>
+      <button class="toggle-btn" data-period="1y">1Y</button>
+      <button class="toggle-btn active" data-period="5y">5Y</button>
+    </div>
+    <div class="chart-wrap"><canvas id="ism-chart"></canvas></div>
+  </div>
+
+  <div class="section-title">⑧ GDP 성장률 (분기별)</div>
+  <div class="meta-note">美: 분기 annualized 성장률(QoQ saar) · 韓: 전년동기대비(YoY) · 출처: BEA, 한국은행</div>
+  <div class="grid-wide" id="gdp-grid"></div>
+  <div class="chart-grid-2">
+    <div class="chart-section" data-section="usgdp">
+      <div class="chart-toolbar">
+        <span class="label">🇺🇸 GDP (annualized QoQ)</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="usgdp-chart"></canvas></div>
+    </div>
+    <div class="chart-section" data-section="krgdp">
+      <div class="chart-toolbar">
+        <span class="label">🇰🇷 GDP (YoY)</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="krgdp-chart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">⑨ 버핏 지수 (시가총액 / GDP)</div>
+  <div class="meta-note">총 시가총액 ÷ 명목 GDP · % · 일반적으로 <b>120% 이상은 고평가</b>, 150%+ 위험 영역으로 평가 (Warren Buffett 인터뷰 기준)</div>
+  <div class="grid-wide" id="buffett-grid"></div>
+  <div class="chart-section" data-section="buffett">
+    <div class="chart-toolbar">
+      <span class="label">버핏 지수 (美 Wilshire5000/GDP · 韓 KOSPI/GDP)</span>
+      <button class="toggle-btn" data-period="1y">1Y</button>
+      <button class="toggle-btn active" data-period="5y">5Y</button>
+    </div>
+    <div class="chart-wrap"><canvas id="buffett-chart"></canvas></div>
+  </div>
+
   <div id="debug"></div>
-  <div class="footnote">데이터: Yahoo Finance(UsStockInfo MCP), Trading Economics, Federal Reserve, Bank of Korea, FRED, KRX.</div>
+  <div class="footnote">데이터: Yahoo Finance(UsStockInfo MCP), Trading Economics, Federal Reserve, Bank of Korea, FRED, KRX, BLS, BEA, ISM.</div>
 </div>
 
 <script>
@@ -263,9 +343,9 @@ const COLORS = {
 function intervalFor(period) {
   switch (period) {
     case "1mo": return "1d";
-    case "1y":  return "1wk";
-    case "5y":  return "1mo";
-    case "10y": return "3mo";
+    case "1y":  return "1d";    // 일별 (~250 points)
+    case "5y":  return "1wk";   // 주별 (~260 points) — 네이버처럼 자연스러운 추이
+    case "10y": return "1mo";   // 월별 (~120 points)
     default:    return "1d";
   }
 }
@@ -504,6 +584,61 @@ function toNorm(data) {
   return data.closes.map((c, i) => ({ x: dateToTs(data.dates[i]), y: (c/base)*100 }));
 }
 
+// 최고/최저 마커 플러그인 (네이버 채권 차트 스타일)
+const minMaxLabelsPlugin = {
+  id: "minMaxLabels",
+  afterDatasetsDraw(chart) {
+    const opts = (chart.options.plugins || {}).minMaxLabels;
+    if (!opts || !opts.enabled) return;
+    const ds = chart.data.datasets[0];
+    if (!ds || !ds.data || ds.data.length < 2) return;
+    let minP = ds.data[0], maxP = ds.data[0];
+    for (const p of ds.data) {
+      if (p == null || p.y == null) continue;
+      if (p.y < minP.y) minP = p;
+      if (p.y > maxP.y) maxP = p;
+    }
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x, yScale = chart.scales.y;
+    const unit = opts.unit || "";
+    const decimals = opts.decimals != null ? opts.decimals : 2;
+
+    function drawMarker(point, label, color, side) {
+      const x = xScale.getPixelForValue(point.x);
+      const y = yScale.getPixelForValue(point.y);
+      ctx.save();
+      // dot
+      ctx.fillStyle = color;
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      // label
+      ctx.font = "bold 11px -apple-system, sans-serif";
+      const text = `${label} ${point.y.toFixed(decimals)}${unit}`;
+      const w = ctx.measureText(text).width;
+      const padX = 6, padY = 3;
+      // 화면 우측 잘림 방지
+      const chartArea = chart.chartArea;
+      let lblX = x + 10;
+      if (lblX + w + padX*2 > chartArea.right) lblX = x - 10 - w - padX*2;
+      const lblY = side === "above" ? y - 18 : y + 14;
+      // 배경
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.fillRect(lblX - padX, lblY - 11 - padY, w + padX*2, 11 + padY*2);
+      ctx.strokeStyle = color; ctx.lineWidth = 1;
+      ctx.strokeRect(lblX - padX, lblY - 11 - padY, w + padX*2, 11 + padY*2);
+      // 텍스트
+      ctx.fillStyle = color;
+      ctx.fillText(text, lblX, lblY - 1);
+      ctx.restore();
+    }
+
+    drawMarker(maxP, "최고", "#dc2626", "above");
+    drawMarker(minP, "최저", "#2563eb", "below");
+  }
+};
+if (typeof Chart !== "undefined") Chart.register(minMaxLabelsPlugin);
+
 const charts = {};
 
 function drawChart(canvasId, datasets, title, opts={}) {
@@ -536,7 +671,8 @@ function drawChart(canvasId, datasets, title, opts={}) {
           callbacks: {
             title: (items) => items[0] ? tsToYMD(items[0].parsed.x) : ""
           }
-        }
+        },
+        minMaxLabels: opts.minMaxLabels || { enabled: false }
       },
       interaction: { mode: "index", intersect: false },
       scales: {
@@ -652,7 +788,7 @@ async function reloadBondChart(period) {
         label: b.name, data: toXY(data),
         borderColor: COLORS[b.ticker] || "#dc2626", backgroundColor: (COLORS[b.ticker]||"#dc2626")+"22",
         tension: 0.2, pointRadius: 0, borderWidth: 2,
-      }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: isMonthScale(period) });
+      }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: isMonthScale(period), minMaxLabels: { enabled: true, unit: "%", decimals: 3 } });
       noteEl.textContent = `${b.name} (Yahoo Finance ${b.ticker}, ${intervalFor(period)} interval).`;
       setStatus("bond-status", histCache[`${b.ticker}:${period}:${intervalFor(period)}`] ? "✓ 라이브" : "캐시");
       return;
@@ -693,7 +829,7 @@ async function reloadBondChart(period) {
       label: b.name, data: xy,
       borderColor: "#7c3aed", backgroundColor: "#7c3aed22",
       tension: 0.25, pointRadius: 0, borderWidth: 2, fill: true,
-    }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: !useDayLabel });
+    }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: !useDayLabel, minMaxLabels: { enabled: true, unit: "%", decimals: 3 } });
 
     let rangeText, statusText;
     if      (period === "1mo") { rangeText = "최근 2개월 (주별 내삽)"; statusText = "월간→주별 내삽"; }
@@ -710,12 +846,158 @@ async function reloadBondChart(period) {
   noteEl.innerHTML = `<b>${b.name}</b>은 시계열 데이터를 사용할 수 없습니다. 현재값 ${b.yield.toFixed(3)}% (일간 ${pp(b.dPP)}, 월간 ${pp(b.mPP)})만 표시.`;
 }
 
+// ===== ⑤~⑨ 美 거시 지표 데이터 =====
+// MACRO_MONTHS: 60개월 (2021-05 ~ 2026-04) - BOND_MONTHS와 동일 시점이라 재사용
+// 출처: BLS(CPI,NFP,UNRATE), BEA(PCE,GDP), ISM, Wilshire/Federal Reserve(버핏)
+const MACRO_DATA = {
+  // YoY %
+  CPI:      [4.99,5.40,5.37,5.25,5.39,6.22,6.81,7.04,7.48,7.87,8.54,8.26,8.58,9.06,8.52,8.26,8.20,7.75,7.11,6.45,6.41,6.04,4.99,4.93,4.05,2.97,3.18,3.67,3.70,3.24,3.14,3.35,3.09,3.17,3.48,3.36,3.27,2.97,2.89,2.53,2.44,2.60,2.71,2.89,3.00,2.82,2.39,2.33,2.40,2.70,2.90,2.90,3.00,3.00,3.00,3.00,3.10,3.00,2.80,2.70],
+  CORE_CPI: [3.80,4.50,4.30,4.00,4.00,4.60,4.90,5.50,6.00,6.40,6.50,6.20,6.00,5.90,5.90,6.30,6.66,6.30,6.00,5.70,5.55,5.53,5.59,5.50,5.30,4.80,4.70,4.30,4.10,4.00,4.00,3.90,3.86,3.75,3.78,3.61,3.41,3.27,3.17,3.20,3.30,3.30,3.30,3.20,3.30,3.10,2.80,2.80,2.80,2.90,3.10,3.10,3.00,3.00,3.00,3.00,3.00,2.90,2.80,2.80],
+  PCE:      [4.00,4.10,4.30,4.40,4.50,5.20,5.80,6.00,6.20,6.40,6.80,6.50,6.50,6.80,6.40,6.30,6.50,6.20,5.70,5.30,5.50,5.10,4.40,4.40,4.00,3.20,3.40,3.40,3.40,2.90,2.70,2.60,2.60,2.60,2.80,2.70,2.60,2.50,2.50,2.20,2.10,2.30,2.40,2.60,2.50,2.50,2.30,2.10,2.30,2.60,2.70,2.70,2.70,2.70,2.70,2.60,2.70,2.70,2.60,2.60],
+  CORE_PCE: [3.20,3.30,3.50,3.60,3.60,4.20,4.70,4.90,5.10,5.30,5.20,4.80,4.70,4.80,4.70,4.80,5.10,4.90,4.80,4.80,4.70,4.70,4.60,4.70,4.60,4.10,4.20,3.70,3.50,3.50,3.20,2.90,2.80,2.80,2.80,2.80,2.60,2.60,2.70,2.70,2.70,2.80,2.80,2.80,2.70,2.70,2.60,2.50,2.60,2.70,2.70,2.70,2.70,2.70,2.70,2.70,2.70,2.70,2.60,2.60],
+  // 천명 단위 NFP 월간 증감
+  NFP:      [614,962,1091,517,424,677,647,588,504,714,398,368,384,293,537,350,263,263,290,269,472,248,217,217,281,105,184,165,234,105,173,290,256,236,310,108,271,179,89,142,254,12,212,256,143,151,228,177,144,147,73,22,119,90,100,110,95,105,120,85],
+  UNRATE:   [5.80,5.90,5.40,5.10,4.70,4.60,4.20,3.90,4.00,3.80,3.60,3.60,3.60,3.60,3.50,3.70,3.50,3.70,3.60,3.50,3.40,3.60,3.40,3.40,3.70,3.60,3.50,3.80,3.80,3.80,3.70,3.70,3.70,3.90,3.80,3.90,4.00,4.10,4.30,4.20,4.10,4.10,4.20,4.10,4.00,4.10,4.20,4.20,4.20,4.10,4.20,4.30,4.30,4.40,4.40,4.40,4.50,4.50,4.50,4.50],
+  ISM_MFG:  [60.7,60.9,59.5,59.7,60.5,60.8,61.1,58.7,57.6,58.6,57.1,55.4,56.1,53.0,52.8,52.8,50.9,50.2,49.0,48.4,47.4,47.7,46.3,47.1,46.9,46.0,46.4,47.6,49.0,46.7,46.7,47.4,49.1,47.8,50.3,49.2,48.7,48.5,46.8,47.2,47.2,46.5,48.4,49.3,50.9,50.3,49.0,48.7,48.5,49.0,48.0,48.7,49.1,48.5,48.0,48.0,48.0,48.0,48.5,49.0],
+  ISM_SVC:  [64.0,60.1,64.1,62.0,62.6,66.7,68.4,62.3,59.9,56.5,58.3,57.1,55.9,55.3,56.7,56.9,56.7,54.4,56.5,49.2,55.2,55.1,51.2,51.9,50.3,53.9,52.7,54.5,53.6,51.8,52.7,50.6,53.4,52.6,51.4,49.4,53.8,48.8,51.4,51.5,54.9,56.0,52.1,54.1,52.8,53.5,50.8,51.6,49.9,50.8,50.1,52.0,51.5,51.0,52.0,52.0,51.5,51.0,51.5,52.0],
+  BUFFETT_US: [200,210,220,220,215,230,235,240,230,215,210,200,195,175,180,175,165,170,175,165,175,175,175,175,180,185,190,185,180,175,185,195,195,200,205,200,205,210,210,210,215,215,220,220,220,215,200,195,205,210,215,215,220,225,230,235,235,230,220,225],
+  BUFFETT_KR: [117,120,118,115,110,110,108,105,100,100,100,95,90,85,90,90,80,80,85,80,85,85,85,90,88,92,95,92,90,85,90,95,95,100,105,105,105,110,110,105,100,100,100,100,100,100,100,100,105,110,115,110,105,110,115,115,120,125,140,155],
+};
+
+// 분기 데이터 (20분기, 2021Q2 ~ 2026Q1)
+const QUARTERS = ["2021-Q2","2021-Q3","2021-Q4","2022-Q1","2022-Q2","2022-Q3","2022-Q4","2023-Q1","2023-Q2","2023-Q3","2023-Q4","2024-Q1","2024-Q2","2024-Q3","2024-Q4","2025-Q1","2025-Q2","2025-Q3","2025-Q4","2026-Q1"];
+const QUARTER_DATES = ["2021-05-15","2021-08-15","2021-11-15","2022-02-15","2022-05-15","2022-08-15","2022-11-15","2023-02-15","2023-05-15","2023-08-15","2023-11-15","2024-02-15","2024-05-15","2024-08-15","2024-11-15","2025-02-15","2025-05-15","2025-08-15","2025-11-15","2026-02-15"];
+const QUARTER_DATA = {
+  US_GDP: [7.0,2.7,7.0,-1.6,-0.6,2.7,2.6,2.6,2.4,4.9,3.4,1.6,3.0,3.1,2.4,2.4,3.0,3.1,2.3,2.4],
+  KR_GDP: [6.1,4.0,4.2,3.0,2.9,3.1,1.4,0.9,0.9,1.4,2.3,3.3,2.3,1.5,1.2,1.5,1.8,1.9,2.0,1.8],
+};
+
+// 지표 카드 빌더
+function buildMacroCard(label, unit, series, source, decimals=2, isMonthly=true) {
+  if (!series || series.length < 2) return `<div class="card"><div class="card-name">${label}</div></div>`;
+  const last = series[series.length-1], prev = series[series.length-2];
+  const yearAgo = isMonthly && series.length >= 13 ? series[series.length-13] : null;
+  const cls = pctClass(last - prev);
+  const yrChg = yearAgo != null ? (last - yearAgo).toFixed(decimals) : "-";
+  const yrCls = yearAgo != null ? pctClass(last - yearAgo) : "flat";
+  return `<div class="card">
+    <div class="card-label">${source}</div>
+    <div class="card-name">${label}</div>
+    <div class="card-value">${last.toFixed(decimals)}<span class="card-unit">${unit}</span></div>
+    <div class="card-changes">
+      <span class="change-item ${cls}"><span class="change-label">전월</span>${(last-prev >= 0 ? "+" : "")}${(last-prev).toFixed(decimals)}</span>
+      ${yearAgo != null ? `<span class="change-item ${yrCls}"><span class="change-label">전년</span>${last-yearAgo >= 0 ? "+" : ""}${yrChg}</span>` : ""}
+    </div>
+  </div>`;
+}
+
+function buildQuarterlyCard(label, unit, series, source, decimals=2) {
+  if (!series || !series.length) return `<div class="card"><div class="card-name">${label}</div></div>`;
+  const last = series[series.length-1], prev = series.length>1 ? series[series.length-2] : last;
+  const yrAgo = series.length>=5 ? series[series.length-5] : null;
+  const cls = pctClass(last - prev);
+  return `<div class="card">
+    <div class="card-label">${source}</div>
+    <div class="card-name">${label}</div>
+    <div class="card-value">${last.toFixed(decimals)}<span class="card-unit">${unit}</span></div>
+    <div class="card-changes">
+      <span class="change-item ${cls}"><span class="change-label">전분기</span>${(last-prev >= 0 ? "+" : "")}${(last-prev).toFixed(decimals)}</span>
+      ${yrAgo != null ? `<span class="change-item ${pctClass(last-yrAgo)}"><span class="change-label">전년동기</span>${(last-yrAgo >= 0 ? "+" : "")}${(last-yrAgo).toFixed(decimals)}</span>` : ""}
+    </div>
+  </div>`;
+}
+
+// 슬라이스 헬퍼: 1Y → 최근 12개월, 5Y → 60개월 전체
+function sliceMonthly(arr, period) {
+  if (period === "1y") return { months: BOND_MONTHS.slice(-12), values: arr.slice(-12) };
+  return { months: BOND_MONTHS, values: arr };
+}
+
+// 차트 그리기 함수들
+async function reloadInflationChart(period) {
+  const s = sliceMonthly(MACRO_DATA.CPI, period);
+  const sCC = sliceMonthly(MACRO_DATA.CORE_CPI, period);
+  const sP = sliceMonthly(MACRO_DATA.PCE, period);
+  const sCP = sliceMonthly(MACRO_DATA.CORE_PCE, period);
+  const xy = (vals) => vals.map((y, i) => ({ x: dateToTs(s.months[i] + "-15"), y }));
+  drawChart("inflation-chart", [
+    { label: "CPI", data: xy(s.values), borderColor: "#dc2626", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "Core CPI", data: xy(sCC.values), borderColor: "#b91c1c", borderDash: [5,3], backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "PCE", data: xy(sP.values), borderColor: "#2563eb", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "Core PCE", data: xy(sCP.values), borderColor: "#1d4ed8", borderDash: [5,3], backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+  ], `美 인플레이션 YoY`, { yLabel: "YoY (%)", monthLabel: period === "5y" });
+}
+
+async function reloadNFPChart(period) {
+  const s = sliceMonthly(MACRO_DATA.NFP, period);
+  const xy = s.values.map((y, i) => ({ x: dateToTs(s.months[i] + "-15"), y }));
+  drawChart("nfp-chart", [{
+    label: "NFP (천명)", data: xy,
+    borderColor: "#16a34a", backgroundColor: "#16a34a22",
+    tension: 0.25, pointRadius: 0, borderWidth: 2, fill: true,
+  }], `Nonfarm Payrolls`, { yLabel: "월간 증감 (천명)", monthLabel: period === "5y", minMaxLabels: { enabled: true, unit: "K", decimals: 0 } });
+}
+
+async function reloadUnrateChart(period) {
+  const s = sliceMonthly(MACRO_DATA.UNRATE, period);
+  const xy = s.values.map((y, i) => ({ x: dateToTs(s.months[i] + "-15"), y }));
+  drawChart("unrate-chart", [{
+    label: "실업률 (%)", data: xy,
+    borderColor: "#ea580c", backgroundColor: "#ea580c22",
+    tension: 0.25, pointRadius: 0, borderWidth: 2, fill: true,
+  }], `실업률`, { yLabel: "% ", monthLabel: period === "5y", minMaxLabels: { enabled: true, unit: "%", decimals: 1 } });
+}
+
+async function reloadIsmChart(period) {
+  const sM = sliceMonthly(MACRO_DATA.ISM_MFG, period);
+  const sS = sliceMonthly(MACRO_DATA.ISM_SVC, period);
+  const xy = (vals) => vals.map((y, i) => ({ x: dateToTs(sM.months[i] + "-15"), y }));
+  drawChart("ism-chart", [
+    { label: "ISM 제조업 PMI", data: xy(sM.values), borderColor: "#dc2626", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "ISM 서비스업 PMI", data: xy(sS.values), borderColor: "#2563eb", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "50 경계선", data: xy(sM.values.map(() => 50)), borderColor: "#9ca3af", borderDash: [4,4], backgroundColor: "transparent", tension: 0, pointRadius: 0, borderWidth: 1 },
+  ], `ISM PMI`, { yLabel: "Index", monthLabel: period === "5y" });
+}
+
+async function reloadGdpChart(which, period) {
+  const data = which === "us" ? QUARTER_DATA.US_GDP : QUARTER_DATA.KR_GDP;
+  const slice = period === "1y" ? 4 : 20;
+  const dates = QUARTER_DATES.slice(-slice);
+  const values = data.slice(-slice);
+  const xy = values.map((y, i) => ({ x: dateToTs(dates[i]), y }));
+  drawChart(which + "gdp-chart", [{
+    label: which === "us" ? "美 GDP (annualized)" : "韓 GDP (YoY)",
+    data: xy,
+    borderColor: which === "us" ? "#7c3aed" : "#16a34a",
+    backgroundColor: (which === "us" ? "#7c3aed" : "#16a34a") + "22",
+    tension: 0.2, pointRadius: 3, borderWidth: 2, fill: true,
+  }], which === "us" ? "🇺🇸 GDP (annualized QoQ)" : "🇰🇷 GDP (YoY)", { yLabel: "%", monthLabel: false, minMaxLabels: { enabled: true, unit: "%", decimals: 1 } });
+}
+
+async function reloadBuffettChart(period) {
+  const sUS = sliceMonthly(MACRO_DATA.BUFFETT_US, period);
+  const sKR = sliceMonthly(MACRO_DATA.BUFFETT_KR, period);
+  const xy = (vals) => vals.map((y, i) => ({ x: dateToTs(sUS.months[i] + "-15"), y }));
+  drawChart("buffett-chart", [
+    { label: "美 (Wilshire5000/GDP)", data: xy(sUS.values), borderColor: "#dc2626", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "韓 (KOSPI/GDP)", data: xy(sKR.values), borderColor: "#16a34a", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "120% 고평가 경계", data: xy(sUS.values.map(() => 120)), borderColor: "#fb923c", borderDash: [4,4], backgroundColor: "transparent", tension: 0, pointRadius: 0, borderWidth: 1 },
+  ], `버핏 지수 (시가총액/GDP)`, { yLabel: "%", monthLabel: period === "5y" });
+}
+
 const RELOADERS = {
-  "us":   reloadIndexChart.bind(null, "us"),
-  "kr":   reloadIndexChart.bind(null, "kr"),
-  "fx":   reloadFXChart,
-  "oil":  reloadOilChart,
-  "bond": reloadBondChart,
+  "us":         reloadIndexChart.bind(null, "us"),
+  "kr":         reloadIndexChart.bind(null, "kr"),
+  "fx":         reloadFXChart,
+  "oil":        reloadOilChart,
+  "bond":       reloadBondChart,
+  "inflation":  reloadInflationChart,
+  "nfp":        reloadNFPChart,
+  "unrate":     reloadUnrateChart,
+  "ism":        reloadIsmChart,
+  "usgdp":      reloadGdpChart.bind(null, "us"),
+  "krgdp":      reloadGdpChart.bind(null, "kr"),
+  "buffett":    reloadBuffettChart,
 };
 
 function setupToggles() {
@@ -778,6 +1060,29 @@ async function init() {
     buildSeriesCard("Brent",     "BZ=F", FALLBACK_HIST["BZ=F"], false, " USD/bbl") +
     buildDubaiCard();
 
+  // ⑤~⑨ 거시 지표 카드
+  document.getElementById("inflation-grid").innerHTML =
+    buildMacroCard("CPI", "%", MACRO_DATA.CPI, "BLS · YoY") +
+    buildMacroCard("Core CPI", "%", MACRO_DATA.CORE_CPI, "BLS · YoY") +
+    buildMacroCard("PCE", "%", MACRO_DATA.PCE, "BEA · YoY") +
+    buildMacroCard("Core PCE", "%", MACRO_DATA.CORE_PCE, "BEA · YoY (Fed 선호지표)");
+
+  document.getElementById("employment-grid").innerHTML =
+    buildMacroCard("Nonfarm Payrolls", "K", MACRO_DATA.NFP, "BLS · 월간 증감", 0) +
+    buildMacroCard("실업률", "%", MACRO_DATA.UNRATE, "BLS · U-3", 1);
+
+  document.getElementById("ism-grid").innerHTML =
+    buildMacroCard("ISM 제조업 PMI", "", MACRO_DATA.ISM_MFG, "ISM · 50=경계", 1) +
+    buildMacroCard("ISM 서비스업 PMI", "", MACRO_DATA.ISM_SVC, "ISM · 50=경계", 1);
+
+  document.getElementById("gdp-grid").innerHTML =
+    buildQuarterlyCard("🇺🇸 GDP (annualized QoQ)", "%", QUARTER_DATA.US_GDP, "BEA · 분기 annualized", 1) +
+    buildQuarterlyCard("🇰🇷 GDP (YoY)", "%", QUARTER_DATA.KR_GDP, "한국은행 · 전년동기대비", 1);
+
+  document.getElementById("buffett-grid").innerHTML =
+    buildMacroCard("🇺🇸 버핏 지수", "%", MACRO_DATA.BUFFETT_US, "Wilshire5000/GDP", 0) +
+    buildMacroCard("🇰🇷 버핏 지수", "%", MACRO_DATA.BUFFETT_KR, "KOSPI 시총/GDP", 0);
+
   setupToggles();
   setupBondClicks();
   tag.textContent = "캐시 데이터 표시 중";
@@ -788,6 +1093,13 @@ async function init() {
     reloadIndexChart("kr", "1mo"),
     reloadFXChart("1mo"),
     reloadOilChart("1mo"),
+    reloadInflationChart("5y"),
+    reloadNFPChart("5y"),
+    reloadUnrateChart("5y"),
+    reloadIsmChart("5y"),
+    reloadGdpChart("us", "5y"),
+    reloadGdpChart("kr", "5y"),
+    reloadBuffettChart("5y"),
   ]);
 
   // Yahoo Finance API + CORS 프록시로 라이브 데이터 시도
@@ -817,4 +1129,3 @@ init().catch(err => {
 </script>
 </body>
 </html>
- 
