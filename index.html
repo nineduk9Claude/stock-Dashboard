@@ -1166,4 +1166,9 @@ async function init() {
 }
 
 init().catch(err => {
-  document.getElementById("debug").textContent = "초기화 오류: "
+  document.getElementById("debug").textContent = "초기화 오류: " + (err && err.message ? err.message : err);
+  console.error(err);
+});
+</script>
+</body>
+</html>
