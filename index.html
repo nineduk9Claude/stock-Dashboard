@@ -650,7 +650,7 @@ const minMaxLabelsPlugin = {
     drawMarker(minP, "최저", "#2563eb", "below");
   }
 };
-if (typeof Chart !== "undefined") Chart.register(minMaxLabelsPlugin);
+try { if (typeof Chart !== "undefined" && Chart.register) Chart.register(minMaxLabelsPlugin); } catch(e) { console.warn("[minMaxLabelsPlugin] register failed:", e); }
 
 const charts = {};
 
@@ -1156,4 +1156,14 @@ async function init() {
 
   const wti = histCache["CL=F:1mo:1d"], brn = histCache["BZ=F:1mo:1d"];
   document.getElementById("oil-grid").innerHTML =
-    buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"]
+    buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
+    buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
+    buildDubaiCard();
+
+  tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
+  tag.className = "source-tag live";
+  debugEl.textContent = "";
+}
+
+init().catch(err => {
+  document.getElementById("debug").textContent = "초기화 오류: "
