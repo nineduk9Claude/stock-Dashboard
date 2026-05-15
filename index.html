@@ -769,23 +769,34 @@ async function reloadOilChart(period) {
   if (wti) ds.push({ label: "WTI",   data: toXY(wti), borderColor: COLORS["CL=F"], backgroundColor: COLORS["CL=F"]+"22", tension: 0.2, pointRadius: 0, borderWidth: 2 });
   if (brn) ds.push({ label: "Brent", data: toXY(brn), borderColor: COLORS["BZ=F"], backgroundColor: COLORS["BZ=F"]+"22", tension: 0.2, pointRadius: 0, borderWidth: 2 });
 
-  // Dubai 12개월 평균 - 모든 기간에 표시 (timestamp 기반이라 자동 정렬)
-  const dubaiData = DUBAI_MONTHLY.map(m => ({ x: dateToTs(m.date), y: m.price }));
-  ds.push({
-    label: "Dubai (월평균)", data: dubaiData,
-    borderColor: COLORS.DUBAI, backgroundColor: COLORS.DUBAI+"22",
-    tension: 0.2, pointRadius: 3, borderWidth: 2, borderDash: [4, 3]
-  });
+  // Dubai: WTI/Brent의 시계열 범위 안에 있는 월 평균만 표시 (1M에서는 자동 제외)
+  let hasDubai = false;
+  if (wti && wti.dates && wti.dates.length > 0) {
+    const wtiStartTs = dateToTs(wti.dates[0]);
+    const wtiEndTs = dateToTs(wti.dates[wti.dates.length-1]);
+    const dubaiData = DUBAI_MONTHLY
+      .map(m => ({ x: dateToTs(m.date), y: m.price }))
+      .filter(p => p.x >= wtiStartTs && p.x <= wtiEndTs);
+    if (dubaiData.length >= 2) {  // 최소 2점 이상 있어야 라인으로 그리기
+      ds.push({
+        label: "Dubai (월평균)", data: dubaiData,
+        borderColor: COLORS.DUBAI, backgroundColor: COLORS.DUBAI+"22",
+        tension: 0.2, pointRadius: 3, borderWidth: 2, borderDash: [4, 3]
+      });
+      hasDubai = true;
+    }
+  }
 
   if (ds.length === 0) {
     drawChart("oil-chart", [], `유가 ${period.toUpperCase()} - 데이터 없음`);
     setStatus("oil-status", "❌ 데이터 없음");
     return;
   }
-  drawChart("oil-chart", ds, `유가 ${period.toUpperCase()} (Dubai 월평균 포함)`, { yLabel: "USD/bbl", monthLabel: isMonthScale(period) });
+  drawChart("oil-chart", ds, `유가 ${period.toUpperCase()}${hasDubai ? " (Dubai 월평균 포함)" : ""}`, { yLabel: "USD/bbl", monthLabel: isMonthScale(period) });
   const wtiLive = !!histCache[`CL=F:${period}:${intervalFor(period)}`];
   const brnLive = !!histCache[`BZ=F:${period}:${intervalFor(period)}`];
-  setStatus("oil-status", (wtiLive && brnLive) ? "✓ WTI/Brent 라이브 + Dubai 월평균" : "캐시 + Dubai 월평균");
+  const dubaiText = hasDubai ? " + Dubai 월평균" : "";
+  setStatus("oil-status", (wtiLive && brnLive) ? "✓ WTI/Brent 라이브" + dubaiText : "캐시" + dubaiText);
 }
 
 let currentBondIdx = null;
@@ -1145,19 +1156,4 @@ async function init() {
 
   const wti = histCache["CL=F:1mo:1d"], brn = histCache["BZ=F:1mo:1d"];
   document.getElementById("oil-grid").innerHTML =
-    buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
-    buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
-    buildDubaiCard();
-
-  tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
-  tag.className = "source-tag live";
-  debugEl.textContent = "";
-}
-
-init().catch(err => {
-  document.getElementById("debug").textContent = "초기화 오류: " + (err && err.message ? err.message : err);
-  console.error(err);
-});
-</script>
-</body>
-</html>
+    buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"]
