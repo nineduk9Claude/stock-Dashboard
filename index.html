@@ -518,8 +518,11 @@ function buildBondCard(b, idx) {
   const dPctRel = (b.dPP / (b.yield - b.dPP)) * 100;
   const mPctRel = (b.mPP / (b.yield - b.mPP)) * 100;
   const dCls = pctClass(b.dPP), mCls = pctClass(b.mPP);
+  const liveBadge = b.isLive
+    ? ' <span class="source-tag live">라이브</span>'
+    : ' <span class="source-tag cached">5/1 정적</span>';
   return `<div class="card card-clickable" data-bond-idx="${idx}">
-    <div class="card-label"><span class="flag">${b.flag}</span> ${b.code}</div>
+    <div class="card-label"><span class="flag">${b.flag}</span> ${b.code}${liveBadge}</div>
     <div class="card-name">${b.name}</div>
     <div class="card-value">${b.yield.toFixed(3)}<span class="card-unit">%</span></div>
     <div class="card-changes">
@@ -1159,6 +1162,21 @@ async function init() {
     buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
     buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
     buildDubaiCard();
+
+  // 美 10Y 카드를 ^TNX 라이브 데이터로 갱신 (다른 국가는 라이브 소스 없음 → 정적 유지)
+  const tnxData = histCache["^TNX:1mo:1d"];
+  if (tnxData && tnxData.closes && tnxData.closes.length >= 2) {
+    const closes = tnxData.closes;
+    const last = closes[closes.length - 1];
+    const prev = closes[closes.length - 2];
+    const first = closes[0];
+    BONDS_10Y[0].yield = last;
+    BONDS_10Y[0].dPP = last - prev;
+    BONDS_10Y[0].mPP = last - first;
+    BONDS_10Y[0].isLive = true;
+    document.getElementById("bond-grid").innerHTML = BONDS_10Y.map((b, i) => buildBondCard(b, i)).join("");
+    setupBondClicks();
+  }
 
   tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
   tag.className = "source-tag live";
