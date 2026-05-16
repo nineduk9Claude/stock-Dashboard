@@ -852,9 +852,10 @@ async function reloadBondChart(period) {
     }
 
     const useDayLabel = period === "1mo";
+    // 美 10Y와 동일한 빨간색 fill 스타일로 통일
     drawChart("bond-chart", [{
       label: b.name, data: xy,
-      borderColor: "#7c3aed", backgroundColor: "#7c3aed22",
+      borderColor: "#dc2626", backgroundColor: "#dc262622",
       tension: 0.25, pointRadius: 0, borderWidth: 2, fill: true,
     }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: !useDayLabel, minMaxLabels: { enabled: true, unit: "%", decimals: 3 } });
 
@@ -1146,6 +1147,7 @@ async function init() {
     reloadGdpChart("kr", "5y"),
     reloadGdpChart("jp", "5y"),
     reloadBuffettChart("5y"),
+    fetchHist("^TNX", "1mo"),  // 美 10Y 카드 라이브 갱신용 사전 fetch
   ]);
 
   // Yahoo Finance API + CORS 프록시로 라이브 데이터 시도
