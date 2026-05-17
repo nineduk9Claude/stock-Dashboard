@@ -1240,9 +1240,9 @@ async function init() {
     data.forEach(d => { fredMap[d.date.slice(0,7)] = d.yield; });
     // BOND_HIST의 각 month에 대해 FRED 값으로 갱신 (있는 것만)
     const newSeries = BOND_MONTHS.map(m => fredMap[m] != null ? fredMap[m] : null);
-    // null이 아닌 점 비율이 70% 이상이면 사용
+    // null이 아닌 점 비율이 50% 이상이면 사용 (FRED 일부 월 누락 허용)
     const validCount = newSeries.filter(v => v != null).length;
-    if (validCount >= BOND_MONTHS.length * 0.7) {
+    if (validCount >= BOND_MONTHS.length * 0.5) {
       // null은 기존 값으로 fallback
       const oldSeries = BOND_HIST[code];
       const merged = newSeries.map((v, i) => v != null ? v : oldSeries[i]);
