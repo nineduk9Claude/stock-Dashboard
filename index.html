@@ -212,44 +212,99 @@
   </div>
 
   <div class="section-title">⑧ GDP 성장률 (분기별)</div>
-  <div class="meta-note">美: 분기 annualized 성장률(QoQ saar) · 韓·日: 전년동기대비(YoY) · 출처: BEA, 한국은행, 일본 내각부 · 분기 데이터는 20분기(5년) 보유</div>
+  <div class="meta-note">美: annualized QoQ · 기타: 전년동기대비(YoY) · 출처: BEA, 한국은행, 일본 내각부, 대만 행정원 주계처, NBS, ONS, INSEE · 보유 20분기(5년), 토글 10Y+는 보유 데이터 표시</div>
   <div class="grid-wide" id="gdp-grid"></div>
   <div class="chart-grid-3">
     <div class="chart-section" data-section="usgdp">
       <div class="chart-toolbar">
-        <span class="label">🇺🇸 GDP (annualized QoQ)</span>
+        <span class="label">🇺🇸 GDP</span>
         <button class="toggle-btn" data-period="1y">1Y</button>
         <button class="toggle-btn active" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+        <button class="toggle-btn" data-period="20y">20Y</button>
+        <button class="toggle-btn" data-period="30y">30Y</button>
       </div>
       <div class="chart-wrap"><canvas id="usgdp-chart"></canvas></div>
     </div>
     <div class="chart-section" data-section="krgdp">
       <div class="chart-toolbar">
-        <span class="label">🇰🇷 GDP (YoY)</span>
+        <span class="label">🇰🇷 GDP</span>
         <button class="toggle-btn" data-period="1y">1Y</button>
         <button class="toggle-btn active" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+        <button class="toggle-btn" data-period="20y">20Y</button>
+        <button class="toggle-btn" data-period="30y">30Y</button>
       </div>
       <div class="chart-wrap"><canvas id="krgdp-chart"></canvas></div>
     </div>
     <div class="chart-section" data-section="jpgdp">
       <div class="chart-toolbar">
-        <span class="label">🇯🇵 GDP (YoY)</span>
+        <span class="label">🇯🇵 GDP</span>
         <button class="toggle-btn" data-period="1y">1Y</button>
         <button class="toggle-btn active" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+        <button class="toggle-btn" data-period="20y">20Y</button>
+        <button class="toggle-btn" data-period="30y">30Y</button>
       </div>
       <div class="chart-wrap"><canvas id="jpgdp-chart"></canvas></div>
+    </div>
+    <div class="chart-section" data-section="twgdp">
+      <div class="chart-toolbar">
+        <span class="label">🇹🇼 GDP</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+        <button class="toggle-btn" data-period="20y">20Y</button>
+        <button class="toggle-btn" data-period="30y">30Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="twgdp-chart"></canvas></div>
+    </div>
+    <div class="chart-section" data-section="cngdp">
+      <div class="chart-toolbar">
+        <span class="label">🇨🇳 GDP</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+        <button class="toggle-btn" data-period="20y">20Y</button>
+        <button class="toggle-btn" data-period="30y">30Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="cngdp-chart"></canvas></div>
+    </div>
+    <div class="chart-section" data-section="ukgdp">
+      <div class="chart-toolbar">
+        <span class="label">🇬🇧 GDP</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+        <button class="toggle-btn" data-period="20y">20Y</button>
+        <button class="toggle-btn" data-period="30y">30Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="ukgdp-chart"></canvas></div>
+    </div>
+    <div class="chart-section" data-section="frgdp">
+      <div class="chart-toolbar">
+        <span class="label">🇫🇷 GDP</span>
+        <button class="toggle-btn" data-period="1y">1Y</button>
+        <button class="toggle-btn active" data-period="5y">5Y</button>
+        <button class="toggle-btn" data-period="10y">10Y</button>
+        <button class="toggle-btn" data-period="20y">20Y</button>
+        <button class="toggle-btn" data-period="30y">30Y</button>
+      </div>
+      <div class="chart-wrap"><canvas id="frgdp-chart"></canvas></div>
     </div>
   </div>
 
   <div class="section-title">⑨ 버핏 지수 (시가총액 / GDP)</div>
-  <div class="meta-note">총 시가총액 ÷ 명목 GDP · % · 일반적으로 <b>120% 이상은 고평가</b>, 150%+ 위험 영역으로 평가 (Warren Buffett 인터뷰 기준)</div>
+  <div class="meta-note">총 시가총액 ÷ 명목 GDP · % · <b>120% 이상 고평가, 150%+ 위험</b> (Buffett 기준) · 美/韓/日 10년치 · TW/CN/UK/FR 5년치</div>
   <div class="grid-wide" id="buffett-grid"></div>
   <div class="chart-section" data-section="buffett">
     <div class="chart-toolbar">
-      <span class="label">버핏 지수 (美 Wilshire5000/GDP · 韓 KOSPI/GDP · 日 Topix/GDP)</span>
+      <span class="label">버핏 지수 (7개국)</span>
       <button class="toggle-btn" data-period="1y">1Y</button>
       <button class="toggle-btn active" data-period="5y">5Y</button>
       <button class="toggle-btn" data-period="10y">10Y</button>
+      <button class="toggle-btn" data-period="20y">20Y</button>
+      <button class="toggle-btn" data-period="30y">30Y</button>
     </div>
     <div class="chart-wrap"><canvas id="buffett-chart"></canvas></div>
   </div>
@@ -971,6 +1026,18 @@ const QUARTER_DATA = {
   US_GDP: [7.0,2.7,7.0,-1.6,-0.6,2.7,2.6,2.6,2.4,4.9,3.4,1.6,3.0,3.1,2.4,2.4,3.0,3.1,2.3,2.4],
   KR_GDP: [6.1,4.0,4.2,3.0,2.9,3.1,1.4,0.9,0.9,1.4,2.3,3.3,2.3,1.5,1.2,1.5,1.8,1.9,2.0,1.8],
   JP_GDP: [7.6,0.5,1.0,0.7,1.5,1.6,0.7,2.0,2.3,1.7,1.0,0.0,-1.0,0.4,1.2,0.7,1.4,1.5,1.2,1.0],
+  TW_GDP: [7.4,3.7,5.0,3.6,2.9,4.0,-0.4,-3.0,1.4,1.0,4.8,6.6,5.1,4.2,2.7,3.8,4.5,4.0,3.5,3.8],
+  CN_GDP: [7.9,4.9,4.0,4.8,0.4,3.9,2.9,4.5,6.3,4.9,5.2,5.3,4.7,4.6,5.4,5.4,5.2,4.8,5.0,4.7],
+  UK_GDP: [24.5,7.5,7.4,9.8,4.8,1.9,0.5,0.4,0.4,0.2,-0.2,0.3,0.7,0.9,1.4,1.0,1.2,1.3,1.2,1.0],
+  FR_GDP: [18.3,3.7,5.4,5.3,4.5,1.0,0.4,0.8,1.0,0.6,0.7,1.5,1.0,1.2,1.0,0.6,0.5,0.7,0.7,0.6],
+};
+
+// 신규 4개국 버핏 (시가총액/GDP, 60개월 = 2021-05 ~ 2026-04). MACRO_MONTHS의 마지막 60개월에 정렬.
+const BUFFETT_NEW = {
+  TW: [200,200,195,195,200,205,215,220,230,225,220,215,210,195,185,180,170,175,180,170,180,185,180,185,190,195,200,200,200,195,200,210,220,230,240,230,235,240,235,240,245,250,250,245,245,240,230,225,230,240,250,250,255,260,270,280,285,280,270,260],
+  CN: [80,80,75,75,75,80,80,78,78,75,73,75,70,65,68,72,70,68,70,72,75,75,75,78,75,73,72,70,70,65,68,70,70,68,68,70,70,68,68,65,65,68,70,72,75,75,75,78,80,82,85,85,88,90,88,90,95,95,90,85],
+  UK: [100,102,100,102,100,102,105,105,105,105,100,100,95,90,95,95,90,95,100,95,100,100,100,105,100,105,105,105,105,100,105,105,110,110,115,110,115,115,115,110,110,110,110,110,110,115,115,115,115,120,120,120,125,130,135,140,140,140,135,130],
+  FR: [100,105,105,110,105,110,115,115,115,115,110,110,105,95,100,100,95,100,105,100,105,110,110,115,110,115,115,115,110,105,110,115,120,120,125,120,125,125,125,120,115,115,115,115,115,115,115,115,120,125,125,125,130,135,140,145,145,145,140,135],
 };
 
 // 지표 카드 빌더
@@ -1066,28 +1133,49 @@ async function reloadGdpChart(which, period) {
     us: { data: QUARTER_DATA.US_GDP, color: "#7c3aed", label: "美 GDP (annualized QoQ)", flag: "🇺🇸" },
     kr: { data: QUARTER_DATA.KR_GDP, color: "#16a34a", label: "韓 GDP (YoY)", flag: "🇰🇷" },
     jp: { data: QUARTER_DATA.JP_GDP, color: "#dc2626", label: "日 GDP (YoY)", flag: "🇯🇵" },
+    tw: { data: QUARTER_DATA.TW_GDP, color: "#0891b2", label: "臺 GDP (YoY)", flag: "🇹🇼" },
+    cn: { data: QUARTER_DATA.CN_GDP, color: "#ea580c", label: "中 GDP (YoY)", flag: "🇨🇳" },
+    uk: { data: QUARTER_DATA.UK_GDP, color: "#1d4ed8", label: "英 GDP (YoY)", flag: "🇬🇧" },
+    fr: { data: QUARTER_DATA.FR_GDP, color: "#9333ea", label: "佛 GDP (YoY)", flag: "🇫🇷" },
   }[which];
   if (!cfg) return;
-  const slice = period === "1y" ? 4 : 20;  // 5y/10y → 20분기 (보유 데이터 한계)
+  // 보유 데이터는 20분기(5년). 10Y/20Y/30Y 토글에서는 보유한 데이터 전체.
+  const slice = period === "1y" ? 4 : 20;
   const dates = QUARTER_DATES.slice(-slice);
   const values = cfg.data.slice(-slice);
   const xy = values.map((y, i) => ({ x: dateToTs(dates[i]), y }));
   drawChart(which + "gdp-chart", [{
     label: cfg.label, data: xy,
     borderColor: cfg.color, backgroundColor: cfg.color + "22",
-    tension: 0.2, pointRadius: 3, borderWidth: 2, fill: true,
+    tension: 0.2, pointRadius: 3, borderWidth: 2, fill: false,
   }], `${cfg.flag} ${cfg.label}`, { yLabel: "%", monthLabel: false, minMaxLabels: { enabled: true, unit: "%", decimals: 1 } });
 }
 
 async function reloadBuffettChart(period) {
+  // 기존 3개국 (US/KR/JP)는 120개월 데이터
   const sUS = sliceMonthly(MACRO_DATA.BUFFETT_US, period);
   const sKR = sliceMonthly(MACRO_DATA.BUFFETT_KR, period);
   const sJP = sliceMonthly(MACRO_DATA.BUFFETT_JP, period);
-  const xy = (vals) => vals.map((y, i) => ({ x: dateToTs(sUS.months[i] + "-15"), y }));
+  const xy = (vals, months) => vals.map((y, i) => ({ x: dateToTs((months || sUS.months)[i] + "-15"), y }));
+
+  // 신규 4개국 (TW/CN/UK/FR)은 60개월만 → MACRO_MONTHS의 마지막 60개월에 정렬
+  const tail60Months = MACRO_MONTHS.slice(-60);
+  // period에 따라 신규 데이터도 slice
+  let newStartIdx;
+  if (period === "1y")      newStartIdx = 48;  // 마지막 12개월
+  else                       newStartIdx = 0;   // 5y/10y/20y/30y 모두 보유 60개월 전부
+  const newMonths = tail60Months.slice(newStartIdx);
+  const sliceNew = (arr) => arr.slice(newStartIdx);
+  const xyNew = (vals) => vals.map((y, i) => ({ x: dateToTs(newMonths[i] + "-15"), y }));
+
   drawChart("buffett-chart", [
     { label: "🇺🇸 (Wilshire5000/GDP)", data: xy(sUS.values), borderColor: "#dc2626", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
     { label: "🇰🇷 (KOSPI/GDP)", data: xy(sKR.values), borderColor: "#16a34a", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
     { label: "🇯🇵 (Topix/GDP)", data: xy(sJP.values), borderColor: "#2563eb", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇹🇼 (TWSE/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.TW)), borderColor: "#0891b2", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇨🇳 (SSE/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.CN)), borderColor: "#ea580c", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇬🇧 (FTSE/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.UK)), borderColor: "#1d4ed8", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇫🇷 (CAC/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.FR)), borderColor: "#9333ea", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
     { label: "120% 고평가 경계", data: xy(sUS.values.map(() => 120)), borderColor: "#fb923c", borderDash: [4,4], backgroundColor: "transparent", tension: 0, pointRadius: 0, borderWidth: 1 },
   ], `버핏 지수 (시가총액/GDP)`, { yLabel: "%", monthLabel: period !== "1y" });
 }
@@ -1105,6 +1193,10 @@ const RELOADERS = {
   "usgdp":      reloadGdpChart.bind(null, "us"),
   "krgdp":      reloadGdpChart.bind(null, "kr"),
   "jpgdp":      reloadGdpChart.bind(null, "jp"),
+  "twgdp":      reloadGdpChart.bind(null, "tw"),
+  "cngdp":      reloadGdpChart.bind(null, "cn"),
+  "ukgdp":      reloadGdpChart.bind(null, "uk"),
+  "frgdp":      reloadGdpChart.bind(null, "fr"),
   "buffett":    reloadBuffettChart,
 };
 
@@ -1184,14 +1276,22 @@ async function init() {
     buildMacroCard("ISM 서비스업 PMI", "", MACRO_DATA.ISM_SVC, "ISM · 50=경계", 1);
 
   document.getElementById("gdp-grid").innerHTML =
-    buildQuarterlyCard("🇺🇸 GDP (annualized QoQ)", "%", QUARTER_DATA.US_GDP, "BEA · 분기 annualized", 1) +
-    buildQuarterlyCard("🇰🇷 GDP (YoY)", "%", QUARTER_DATA.KR_GDP, "한국은행 · 전년동기대비", 1) +
-    buildQuarterlyCard("🇯🇵 GDP (YoY)", "%", QUARTER_DATA.JP_GDP, "일본 내각부 · 전년동기대비", 1);
+    buildQuarterlyCard("🇺🇸 GDP (annualized QoQ)", "%", QUARTER_DATA.US_GDP, "BEA", 1) +
+    buildQuarterlyCard("🇰🇷 GDP (YoY)", "%", QUARTER_DATA.KR_GDP, "한국은행", 1) +
+    buildQuarterlyCard("🇯🇵 GDP (YoY)", "%", QUARTER_DATA.JP_GDP, "일본 내각부", 1) +
+    buildQuarterlyCard("🇹🇼 GDP (YoY)", "%", QUARTER_DATA.TW_GDP, "대만 행정원 주계처", 1) +
+    buildQuarterlyCard("🇨🇳 GDP (YoY)", "%", QUARTER_DATA.CN_GDP, "中 NBS", 1) +
+    buildQuarterlyCard("🇬🇧 GDP (YoY)", "%", QUARTER_DATA.UK_GDP, "英 ONS", 1) +
+    buildQuarterlyCard("🇫🇷 GDP (YoY)", "%", QUARTER_DATA.FR_GDP, "佛 INSEE", 1);
 
   document.getElementById("buffett-grid").innerHTML =
     buildMacroCard("🇺🇸 버핏 지수", "%", MACRO_DATA.BUFFETT_US, "Wilshire5000/GDP", 0) +
     buildMacroCard("🇰🇷 버핏 지수", "%", MACRO_DATA.BUFFETT_KR, "KOSPI 시총/GDP", 0) +
-    buildMacroCard("🇯🇵 버핏 지수", "%", MACRO_DATA.BUFFETT_JP, "Topix 시총/GDP", 0);
+    buildMacroCard("🇯🇵 버핏 지수", "%", MACRO_DATA.BUFFETT_JP, "Topix 시총/GDP", 0) +
+    buildMacroCard("🇹🇼 버핏 지수", "%", BUFFETT_NEW.TW, "TWSE 시총/GDP", 0) +
+    buildMacroCard("🇨🇳 버핏 지수", "%", BUFFETT_NEW.CN, "SSE 시총/GDP", 0) +
+    buildMacroCard("🇬🇧 버핏 지수", "%", BUFFETT_NEW.UK, "FTSE 시총/GDP", 0) +
+    buildMacroCard("🇫🇷 버핏 지수", "%", BUFFETT_NEW.FR, "CAC 시총/GDP", 0);
 
   setupToggles();
   setupBondClicks();
@@ -1210,6 +1310,10 @@ async function init() {
     reloadGdpChart("us", "5y"),
     reloadGdpChart("kr", "5y"),
     reloadGdpChart("jp", "5y"),
+    reloadGdpChart("tw", "5y"),
+    reloadGdpChart("cn", "5y"),
+    reloadGdpChart("uk", "5y"),
+    reloadGdpChart("fr", "5y"),
     reloadBuffettChart("5y"),
     fetchHist("^TNX", "1mo"),  // 美 10Y 카드 라이브 갱신용 사전 fetch
   ]);
