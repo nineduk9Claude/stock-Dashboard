@@ -349,6 +349,48 @@ const INDICES = [
   { ticker: "^KQ11", label: "KOSDAQ",    region: "kr" },
 ];
 
+// CF Worker (CORS proxy) - 비미국 채권 FRED 라이브 fetch용
+const CF_WORKER = "https://bond-proxy.nineduk9.workers.dev/";
+const FRED_SERIES = {
+  KR: "IRLTLT01KRM156N",  // OECD Korea 10Y benchmark
+  DE: "IRLTLT01DEM156N",  // Germany
+  UK: "IRLTLT01GBM156N",  // UK (가끔 403)
+  JP: "IRLTLT01JPM156N",  // Japan
+  // CN: FRED IRLT 시리즈 없음 - 정적 유지
+};
+
+async function fetchFredYields(code) {
+  const seriesId = FRED_SERIES[code];
+  if (!seriesId) return null;
+  const cacheKey = "fred:" + seriesId;
+  // localStorage 캐시 (24시간)
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    if (cached && (Date.now() - cached.ts) < 86400000) return cached.data;
+  } catch(e) {}
+  const fredUrl = `https://fred.stlouisfed.org/graph/fredgraph.csv?id=${seriesId}`;
+  const u = CF_WORKER + "?url=" + encodeURIComponent(fredUrl);
+  try {
+    const r = await fetch(u, { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) { console.warn("[fred]", code, "status", r.status); return null; }
+    const txt = await r.text();
+    if (txt.length < 100 || !txt.includes("observation_date")) return null;
+    const lines = txt.trim().split("\n").slice(1);
+    const parsed = lines.map(l => {
+      const parts = l.split(",");
+      const date = parts[0].trim();
+      const val = parseFloat(parts[1]);
+      return { date, yield: val };
+    }).filter(p => !isNaN(p.yield) && p.date && p.yield > 0);
+    if (parsed.length < 12) return null;
+    try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: parsed })); } catch(e) {}
+    return parsed;
+  } catch(e) {
+    console.warn("[fred]", code, e.message);
+    return null;
+  }
+}
+
 const COLORS = {
   "^GSPC": "#dc2626", "^IXIC": "#7c3aed", "^DJI": "#0891b2",
   "^KS11": "#16a34a", "^KQ11": "#ea580c",
@@ -1186,6 +1228,37 @@ async function init() {
     buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
     buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
     buildDubaiCard();
+
+  // 비미국 채권 historical을 FRED에서 라이브 fetch (CF Worker 통과)
+  const fredResults = await Promise.all(["KR","DE","UK","JP"].map(async code => ({ code, data: await fetchFredYields(code) })));
+  let fredLiveCount = 0;
+  fredResults.forEach(({ code, data }) => {
+    if (!data || data.length < 60) return;
+    // FRED 데이터를 BOND_MONTHS와 BOND_HIST 형식으로 변환
+    // BOND_MONTHS는 "YYYY-MM" 포맷, FRED는 "YYYY-MM-DD" 포맷
+    const fredMap = {};
+    data.forEach(d => { fredMap[d.date.slice(0,7)] = d.yield; });
+    // BOND_HIST의 각 month에 대해 FRED 값으로 갱신 (있는 것만)
+    const newSeries = BOND_MONTHS.map(m => fredMap[m] != null ? fredMap[m] : null);
+    // null이 아닌 점 비율이 70% 이상이면 사용
+    const validCount = newSeries.filter(v => v != null).length;
+    if (validCount >= BOND_MONTHS.length * 0.7) {
+      // null은 기존 값으로 fallback
+      const oldSeries = BOND_HIST[code];
+      const merged = newSeries.map((v, i) => v != null ? v : oldSeries[i]);
+      BOND_HIST[code] = merged;
+      // BONDS_10Y 인덱스 찾아 isLive 마크
+      const bondIdx = BONDS_10Y.findIndex(b => b.code === code);
+      if (bondIdx >= 0) BONDS_10Y[bondIdx].isLive = true;
+      fredLiveCount++;
+    }
+  });
+  if (fredLiveCount > 0) {
+    // 채권 카드 다시 그리기 (isLive 배지 갱신)
+    document.getElementById("bond-grid").innerHTML = BONDS_10Y.map((b, i) => buildBondCard(b, i)).join("");
+    setupBondClicks();
+    console.log(`[fred] ${fredLiveCount}/4 countries updated live`);
+  }
 
   // 美 10Y 카드를 ^TNX 라이브 데이터로 갱신 (다른 국가는 라이브 소스 없음 → 정적 유지)
   const tnxData = histCache["^TNX:1mo:1d"];
