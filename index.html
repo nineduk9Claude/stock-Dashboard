@@ -869,10 +869,9 @@ async function reloadBondChart(period) {
       return;
     }
   }
-  // 非美 채권: 60개월 월간 평균값 (FRED IRLTLT01* + 공개 자료)
+  // 非美 채권: 월간 평균값 + spot. X축 [today - period, today] 강제, 첫/끝점 정확히 일치
   const series = BOND_HIST[b.code];
   if (series && series.length) {
-    // X축은 미국과 동일하게 [today - 기간, today] 강제 (시계열 통일)
     const now = Date.now();
     const periodMs = {
       "1mo": 30 * 86400000,
@@ -882,45 +881,46 @@ async function reloadBondChart(period) {
     }[period] || 30 * 86400000;
     const xMin = now - periodMs;
     const xMax = now;
-    const spotTs = now;  // 차트의 우측 끝 (today)에 spot 값을 plot
 
-    // 1M은 최근 2개월을 주별로 내삽해서 ~9개 포인트, 그 외엔 월간값 그대로 사용
-    let xy;
-    if (period === "1mo") {
-      // 최근 3개월 데이터를 주별 내삽
-      const startIdx = series.length - 3;
-      const weekly = [];
-      for (let i = startIdx; i < series.length - 1; i++) {
-        const t0 = new Date(BOND_MONTHS[i] + "-15T00:00:00Z").getTime();
-        const t1 = new Date(BOND_MONTHS[i+1] + "-15T00:00:00Z").getTime();
-        const sY = series[i], eY = series[i+1];
-        for (let w = 0; w < 4; w++) {
-          const tt = w / 4;
-          weekly.push({ x: t0 + (t1 - t0) * tt, y: sY + (eY - sY) * tt });
+    // 헬퍼: 임의 시점 x에서의 yield를 BOND_HIST 월간 데이터 + spot으로 선형 보간
+    const interpolateYieldAt = (x) => {
+      const months = BOND_MONTHS;
+      const ser = series;
+      const firstT = dateToTs(months[0] + "-15");
+      const lastT = dateToTs(months[months.length-1] + "-15");
+      if (x <= firstT) return ser[0];
+      // 마지막 월 데이터 ~ 오늘 spot 사이도 보간
+      if (x >= lastT) {
+        if (x >= now) return b.yield;
+        const tt = (x - lastT) / (now - lastT || 1);
+        return ser[ser.length-1] + (b.yield - ser[ser.length-1]) * tt;
+      }
+      for (let i = 0; i < months.length - 1; i++) {
+        const t0 = dateToTs(months[i] + "-15");
+        const t1 = dateToTs(months[i+1] + "-15");
+        if (x >= t0 && x <= t1) {
+          const tt = (x - t0) / (t1 - t0);
+          return ser[i] + (ser[i+1] - ser[i]) * tt;
         }
       }
-      weekly.push({ x: new Date(BOND_MONTHS[BOND_MONTHS.length-1] + "-15T00:00:00Z").getTime(), y: series[series.length-1] });
-      // Trading Economics 5/1 spot 값을 마지막 점으로 추가 (시계열 연장)
-      weekly.push({ x: spotTs, y: b.yield });
-      xy = weekly;
-    } else {
-      let startIdx;
-      if      (period === "1y")  startIdx = Math.max(0, series.length - 12);
-      else if (period === "5y")  startIdx = Math.max(0, series.length - 60);
-      else                        startIdx = 0;  // 10y → 보유한 60개월 전부
-      const months = BOND_MONTHS.slice(startIdx);
-      const yields = series.slice(startIdx);
-      xy = yields.map((y, i) => ({ x: dateToTs(months[i] + "-15"), y }));
-      // spot 값도 추가
-      xy.push({ x: spotTs, y: b.yield });
+      return ser[ser.length-1];
+    };
+
+    // X축 범위에 정확히 맞춰 균일하게 분포된 데이터 생성 (미국과 동일하게 첫/끝점 일치)
+    const numPts = { "1mo": 30, "1y": 52, "5y": 60, "10y": 120 }[period] || 30;
+    const xy = [];
+    for (let i = 0; i <= numPts; i++) {
+      const t = i / numPts;
+      const x = xMin + (xMax - xMin) * t;
+      xy.push({ x, y: interpolateYieldAt(x) });
     }
 
     const useDayLabel = period === "1mo";
-    // 美 10Y와 동일한 빨간색 fill 스타일 + X축은 today 기준으로 통일
+    // 美 10Y와 동일한 스타일: fill 없는 단순 라인
     drawChart("bond-chart", [{
       label: b.name, data: xy,
       borderColor: "#dc2626", backgroundColor: "#dc262622",
-      tension: 0.25, pointRadius: 0, borderWidth: 2, fill: true,
+      tension: 0.25, pointRadius: 0, borderWidth: 2, fill: false,
     }], `${b.name}`, { yLabel: "Yield (%)", monthLabel: !useDayLabel, minMaxLabels: { enabled: true, unit: "%", decimals: 3 }, xMin, xMax });
 
     let rangeText, statusText;
