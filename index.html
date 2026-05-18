@@ -407,6 +407,41 @@ const INDICES = [
 // CF Worker (CORS proxy) - FRED 등 외부 데이터 라이브 fetch용
 const CF_WORKER = "https://bond-proxy.nineduk9.workers.dev/";
 
+// FRED 시가총액/GDP 연간 시리즈 (World Bank). 30Y 토글용. 2020년까지만.
+const FRED_BUFFETT_SERIES = {
+  US: "DDDM01USA156NWDB",
+  KR: "DDDM01KRA156NWDB",
+  JP: "DDDM01JPA156NWDB",
+  CN: "DDDM01CNA156NWDB",
+  UK: "DDDM01GBA156NWDB",
+  FR: "DDDM01FRA156NWDB",
+};
+const FRED_BUFFETT_LIVE = {};
+
+async function fetchFredBuffett(code) {
+  const id = FRED_BUFFETT_SERIES[code];
+  if (!id) return null;
+  const cacheKey = "fred-buf:" + id;
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    if (cached && (Date.now() - cached.ts) < 86400000) return cached.data;
+  } catch(e) {}
+  try {
+    const r = await fetch(CF_WORKER + "?url=" + encodeURIComponent(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}`), { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const txt = await r.text();
+    if (!txt.includes("observation_date")) return null;
+    const lines = txt.trim().split("\n").slice(1);
+    const points = lines.map(l => {
+      const parts = l.split(",");
+      return { date: parts[0].trim(), value: parseFloat(parts[1]) };
+    }).filter(p => !isNaN(p.value) && p.value > 0);
+    if (points.length < 5) return null;
+    try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: points })); } catch(e) {}
+    return points;
+  } catch(e) { return null; }
+}
+
 // FRED GDP 시리즈 (실질 GDP level → YoY 직접 계산. 대만은 FRED에 없음)
 const FRED_GDP_SERIES = {
   US: "GDPC1",
@@ -1210,32 +1245,56 @@ async function reloadGdpChart(which, period) {
 }
 
 async function reloadBuffettChart(period) {
-  // 기존 3개국 (US/KR/JP)는 120개월 데이터
-  const sUS = sliceMonthly(MACRO_DATA.BUFFETT_US, period);
-  const sKR = sliceMonthly(MACRO_DATA.BUFFETT_KR, period);
-  const sJP = sliceMonthly(MACRO_DATA.BUFFETT_JP, period);
-  const xy = (vals, months) => vals.map((y, i) => ({ x: dateToTs((months || sUS.months)[i] + "-15"), y }));
+  // X축 [today - period, today] 강제
+  const now = Date.now();
+  const periodMs = { "1y": 365*86400000, "5y": 5*365*86400000, "10y": 10*365*86400000, "20y": 20*365*86400000, "30y": 30*365*86400000 }[period] || 5*365*86400000;
+  const xMin = now - periodMs;
+  const xMax = now;
+  const monthlyStartTs = dateToTs("2016-05-15");
+  const newStartTs = dateToTs("2021-05-15");
 
-  // 신규 4개국 (TW/CN/UK/FR)은 60개월만 → MACRO_MONTHS의 마지막 60개월에 정렬
-  const tail60Months = MACRO_MONTHS.slice(-60);
-  // period에 따라 신규 데이터도 slice
-  let newStartIdx;
-  if (period === "1y")      newStartIdx = 48;  // 마지막 12개월
-  else                       newStartIdx = 0;   // 5y/10y/20y/30y 모두 보유 60개월 전부
-  const newMonths = tail60Months.slice(newStartIdx);
-  const sliceNew = (arr) => arr.slice(newStartIdx);
-  const xyNew = (vals) => vals.map((y, i) => ({ x: dateToTs(newMonths[i] + "-15"), y }));
+  // 기존 120개월 (US/KR/JP) + FRED 연간 prepend
+  function buildExisting(code, monthlyData) {
+    const xy = [];
+    if (FRED_BUFFETT_LIVE[code]) {
+      FRED_BUFFETT_LIVE[code].forEach(p => {
+        const ts = dateToTs(p.date);
+        if (ts < monthlyStartTs && ts >= xMin) xy.push({ x: ts, y: p.value });
+      });
+    }
+    MACRO_MONTHS.forEach((m, i) => {
+      const ts = dateToTs(m + "-15");
+      if (monthlyData[i] != null && ts >= xMin && ts <= xMax) xy.push({ x: ts, y: monthlyData[i] });
+    });
+    return xy.sort((a,b) => a.x - b.x);
+  }
+  // 신규 4개국 60개월 + FRED 연간 prepend (TW는 FRED 없음)
+  function buildNew(code) {
+    const xy = [];
+    if (FRED_BUFFETT_LIVE[code]) {
+      FRED_BUFFETT_LIVE[code].forEach(p => {
+        const ts = dateToTs(p.date);
+        if (ts < newStartTs && ts >= xMin) xy.push({ x: ts, y: p.value });
+      });
+    }
+    const tail60 = MACRO_MONTHS.slice(-60);
+    BUFFETT_NEW[code].forEach((v, i) => {
+      const ts = dateToTs(tail60[i] + "-15");
+      if (v != null && ts >= xMin && ts <= xMax) xy.push({ x: ts, y: v });
+    });
+    return xy.sort((a,b) => a.x - b.x);
+  }
 
   drawChart("buffett-chart", [
-    { label: "🇺🇸 (Wilshire5000/GDP)", data: xy(sUS.values), borderColor: "#dc2626", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
-    { label: "🇰🇷 (KOSPI/GDP)", data: xy(sKR.values), borderColor: "#16a34a", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
-    { label: "🇯🇵 (Topix/GDP)", data: xy(sJP.values), borderColor: "#2563eb", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
-    { label: "🇹🇼 (TWSE/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.TW)), borderColor: "#0891b2", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
-    { label: "🇨🇳 (SSE/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.CN)), borderColor: "#ea580c", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
-    { label: "🇬🇧 (FTSE/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.UK)), borderColor: "#1d4ed8", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
-    { label: "🇫🇷 (CAC/GDP)", data: xyNew(sliceNew(BUFFETT_NEW.FR)), borderColor: "#9333ea", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
-    { label: "120% 고평가 경계", data: xy(sUS.values.map(() => 120)), borderColor: "#fb923c", borderDash: [4,4], backgroundColor: "transparent", tension: 0, pointRadius: 0, borderWidth: 1 },
-  ], `버핏 지수 (시가총액/GDP)`, { yLabel: "%", monthLabel: period !== "1y" });
+    { label: "🇺🇸 (Wilshire5000/GDP)", data: buildExisting("US", MACRO_DATA.BUFFETT_US), borderColor: "#dc2626", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇰🇷 (KOSPI/GDP)", data: buildExisting("KR", MACRO_DATA.BUFFETT_KR), borderColor: "#16a34a", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇯🇵 (Topix/GDP)", data: buildExisting("JP", MACRO_DATA.BUFFETT_JP), borderColor: "#2563eb", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇹🇼 (TWSE/GDP)", data: buildNew("TW"), borderColor: "#0891b2", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇨🇳 (SSE/GDP)", data: buildNew("CN"), borderColor: "#ea580c", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇬🇧 (FTSE/GDP)", data: buildNew("UK"), borderColor: "#1d4ed8", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "🇫🇷 (CAC/GDP)", data: buildNew("FR"), borderColor: "#9333ea", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
+    { label: "120% 고평가 경계", data: [{x:xMin,y:120},{x:xMax,y:120}], borderColor: "#fb923c", borderDash: [4,4], backgroundColor: "transparent", tension: 0, pointRadius: 0, borderWidth: 1 },
+  ], `버핏 지수 (시가총액/GDP)`, { yLabel: "%", monthLabel: period !== "1y", xMin, xMax });
 }
 
 const RELOADERS = {
@@ -1390,6 +1449,14 @@ async function init() {
     buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
     buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
     buildDubaiCard();
+
+  // 버핏지수 historical을 FRED 연간(2020년까지)에서 가져와서 prepend (TW 제외)
+  const buffettCodes = ["US","KR","JP","CN","UK","FR"];
+  const bufResults = await Promise.all(buffettCodes.map(async code => ({ code, data: await fetchFredBuffett(code) })));
+  bufResults.forEach(({ code, data }) => { if (data && data.length >= 5) FRED_BUFFETT_LIVE[code] = data; });
+  // 버핏 차트 재로드 (현재 active 토글 유지)
+  const buffActive = document.querySelector('[data-section="buffett"] .toggle-btn.active');
+  await reloadBuffettChart(buffActive ? buffActive.dataset.period : "5y");
 
   // GDP 30년치를 FRED에서 라이브 fetch (대만 제외)
   const gdpCodes = ["US","KR","JP","DE","UK","FR","CN"];
