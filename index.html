@@ -404,8 +404,54 @@ const INDICES = [
   { ticker: "^KQ11", label: "KOSDAQ",    region: "kr" },
 ];
 
-// CF Worker (CORS proxy) - 비미국 채권 FRED 라이브 fetch용
+// CF Worker (CORS proxy) - FRED 등 외부 데이터 라이브 fetch용
 const CF_WORKER = "https://bond-proxy.nineduk9.workers.dev/";
+
+// FRED GDP 시리즈 (실질 GDP level → YoY 직접 계산. 대만은 FRED에 없음)
+const FRED_GDP_SERIES = {
+  US: "GDPC1",
+  KR: "NGDPRSAXDCKRQ",
+  JP: "JPNRGDPEXP",
+  DE: "CLVMNACSCAB1GQDE",
+  UK: "NGDPRSAXDCGBQ",
+  FR: "NGDPRSAXDCFRQ",
+  CN: "CHNGDPNQDSMEI",
+};
+const FRED_GDP_LIVE = {};  // {US: {dates: [...], values: [...]}, ...}
+
+async function fetchFredGdpYoY(code) {
+  const seriesId = FRED_GDP_SERIES[code];
+  if (!seriesId) return null;
+  const cacheKey = "fred-gdp:" + seriesId;
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+    if (cached && (Date.now() - cached.ts) < 86400000) return cached.data;
+  } catch(e) {}
+  try {
+    const r = await fetch(CF_WORKER + "?url=" + encodeURIComponent(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${seriesId}`), { signal: AbortSignal.timeout(12000) });
+    if (!r.ok) return null;
+    const txt = await r.text();
+    if (!txt.includes("observation_date")) return null;
+    const lines = txt.trim().split("\n").slice(1);
+    const points = lines.map(l => {
+      const parts = l.split(",");
+      return { date: parts[0].trim(), level: parseFloat(parts[1]) };
+    }).filter(p => !isNaN(p.level) && p.level > 0);
+    if (points.length < 10) return null;
+    // YoY 계산: (level[t] / level[t-4] - 1) * 100
+    const result = { dates: [], values: [] };
+    for (let i = 4; i < points.length; i++) {
+      result.dates.push(points[i].date);
+      result.values.push((points[i].level / points[i-4].level - 1) * 100);
+    }
+    try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: result })); } catch(e) {}
+    return result;
+  } catch(e) {
+    console.warn("[fred-gdp]", code, e.message);
+    return null;
+  }
+}
+
 const FRED_SERIES = {
   KR: "IRLTLT01KRM156N",  // OECD Korea 10Y benchmark
   DE: "IRLTLT01DEM156N",  // Germany
@@ -1130,25 +1176,37 @@ async function reloadIsmChart(period) {
 
 async function reloadGdpChart(which, period) {
   const cfg = {
-    us: { data: QUARTER_DATA.US_GDP, color: "#7c3aed", label: "美 GDP (annualized QoQ)", flag: "🇺🇸" },
-    kr: { data: QUARTER_DATA.KR_GDP, color: "#16a34a", label: "韓 GDP (YoY)", flag: "🇰🇷" },
-    jp: { data: QUARTER_DATA.JP_GDP, color: "#dc2626", label: "日 GDP (YoY)", flag: "🇯🇵" },
-    tw: { data: QUARTER_DATA.TW_GDP, color: "#0891b2", label: "臺 GDP (YoY)", flag: "🇹🇼" },
-    cn: { data: QUARTER_DATA.CN_GDP, color: "#ea580c", label: "中 GDP (YoY)", flag: "🇨🇳" },
-    uk: { data: QUARTER_DATA.UK_GDP, color: "#1d4ed8", label: "英 GDP (YoY)", flag: "🇬🇧" },
-    fr: { data: QUARTER_DATA.FR_GDP, color: "#9333ea", label: "佛 GDP (YoY)", flag: "🇫🇷" },
+    us: { color: "#7c3aed", label: "美 GDP (YoY)", flag: "🇺🇸", code: "US", fallback: QUARTER_DATA.US_GDP },
+    kr: { color: "#16a34a", label: "韓 GDP (YoY)", flag: "🇰🇷", code: "KR", fallback: QUARTER_DATA.KR_GDP },
+    jp: { color: "#dc2626", label: "日 GDP (YoY)", flag: "🇯🇵", code: "JP", fallback: QUARTER_DATA.JP_GDP },
+    tw: { color: "#0891b2", label: "臺 GDP (YoY)", flag: "🇹🇼", code: "TW", fallback: QUARTER_DATA.TW_GDP },
+    cn: { color: "#ea580c", label: "中 GDP (YoY)", flag: "🇨🇳", code: "CN", fallback: QUARTER_DATA.CN_GDP },
+    uk: { color: "#1d4ed8", label: "英 GDP (YoY)", flag: "🇬🇧", code: "UK", fallback: QUARTER_DATA.UK_GDP },
+    fr: { color: "#9333ea", label: "佛 GDP (YoY)", flag: "🇫🇷", code: "FR", fallback: QUARTER_DATA.FR_GDP },
   }[which];
   if (!cfg) return;
-  // 보유 데이터는 20분기(5년). 10Y/20Y/30Y 토글에서는 보유한 데이터 전체.
-  const slice = period === "1y" ? 4 : 20;
-  const dates = QUARTER_DATES.slice(-slice);
-  const values = cfg.data.slice(-slice);
+
+  // FRED 라이브 데이터 우선, 없으면 정적 fallback
+  let allDates, allValues, isLive = false;
+  if (FRED_GDP_LIVE[cfg.code]) {
+    allDates = FRED_GDP_LIVE[cfg.code].dates;
+    allValues = FRED_GDP_LIVE[cfg.code].values;
+    isLive = true;
+  } else {
+    allDates = QUARTER_DATES;
+    allValues = cfg.fallback;
+  }
+
+  // period에 따른 slice (분기 수). 토글마다 4, 20, 40, 80, 120
+  const sliceCount = { "1y": 4, "5y": 20, "10y": 40, "20y": 80, "30y": 120 }[period] || 20;
+  const dates = allDates.slice(-sliceCount);
+  const values = allValues.slice(-sliceCount);
   const xy = values.map((y, i) => ({ x: dateToTs(dates[i]), y }));
   drawChart(which + "gdp-chart", [{
     label: cfg.label, data: xy,
     borderColor: cfg.color, backgroundColor: cfg.color + "22",
-    tension: 0.2, pointRadius: 3, borderWidth: 2, fill: false,
-  }], `${cfg.flag} ${cfg.label}`, { yLabel: "%", monthLabel: false, minMaxLabels: { enabled: true, unit: "%", decimals: 1 } });
+    tension: 0.2, pointRadius: sliceCount <= 20 ? 3 : 0, borderWidth: 2, fill: false,
+  }], `${cfg.flag} ${cfg.label}${isLive ? " · 라이브" : " · 정적"}`, { yLabel: "%", monthLabel: false, minMaxLabels: { enabled: true, unit: "%", decimals: 1 } });
 }
 
 async function reloadBuffettChart(period) {
@@ -1332,6 +1390,35 @@ async function init() {
     buildSeriesCard("WTI Crude", "CL=F", wti || FALLBACK_HIST["CL=F"], !!wti, " USD/bbl") +
     buildSeriesCard("Brent",     "BZ=F", brn || FALLBACK_HIST["BZ=F"], !!brn, " USD/bbl") +
     buildDubaiCard();
+
+  // GDP 30년치를 FRED에서 라이브 fetch (대만 제외)
+  const gdpCodes = ["US","KR","JP","DE","UK","FR","CN"];
+  const gdpResults = await Promise.all(gdpCodes.map(async code => ({ code, data: await fetchFredGdpYoY(code) })));
+  let gdpLiveCount = 0;
+  gdpResults.forEach(({ code, data }) => {
+    if (data && data.values && data.values.length >= 20) {
+      FRED_GDP_LIVE[code] = data;
+      gdpLiveCount++;
+    }
+  });
+  if (gdpLiveCount > 0) {
+    // 카드도 라이브 데이터로 다시 그리고 차트 재로드
+    document.getElementById("gdp-grid").innerHTML =
+      buildQuarterlyCard("🇺🇸 GDP (YoY)", "%", FRED_GDP_LIVE.US?.values || QUARTER_DATA.US_GDP, "FRED GDPC1 라이브", 1) +
+      buildQuarterlyCard("🇰🇷 GDP (YoY)", "%", FRED_GDP_LIVE.KR?.values || QUARTER_DATA.KR_GDP, "FRED 라이브", 1) +
+      buildQuarterlyCard("🇯🇵 GDP (YoY)", "%", FRED_GDP_LIVE.JP?.values || QUARTER_DATA.JP_GDP, "FRED 라이브", 1) +
+      buildQuarterlyCard("🇹🇼 GDP (YoY)", "%", QUARTER_DATA.TW_GDP, "행정원 (정적)", 1) +
+      buildQuarterlyCard("🇨🇳 GDP (YoY)", "%", FRED_GDP_LIVE.CN?.values || QUARTER_DATA.CN_GDP, "FRED 라이브", 1) +
+      buildQuarterlyCard("🇬🇧 GDP (YoY)", "%", FRED_GDP_LIVE.UK?.values || QUARTER_DATA.UK_GDP, "FRED 라이브", 1) +
+      buildQuarterlyCard("🇫🇷 GDP (YoY)", "%", FRED_GDP_LIVE.FR?.values || QUARTER_DATA.FR_GDP, "FRED 라이브", 1);
+    // 차트도 라이브 데이터로 재로드 (현재 active 토글 유지)
+    await Promise.all(["us","kr","jp","tw","cn","uk","fr"].map(c => {
+      const activeBtn = document.querySelector(`[data-section="${c}gdp"] .toggle-btn.active`);
+      const period = activeBtn ? activeBtn.dataset.period : "5y";
+      return reloadGdpChart(c, period);
+    }));
+    console.log(`[fred-gdp] ${gdpLiveCount}/7 countries live`);
+  }
 
   // 비미국 채권 historical을 FRED에서 라이브 fetch (CF Worker 통과)
   const fredResults = await Promise.all(["KR","DE","UK","JP"].map(async code => ({ code, data: await fetchFredYields(code) })));
