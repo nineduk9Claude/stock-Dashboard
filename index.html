@@ -890,6 +890,8 @@ function drawChart(canvasId, datasets, title, opts={}) {
           title: { display: false }
         },
         y: {
+          ...(opts.yMin != null ? { min: opts.yMin } : {}),
+          ...(opts.yMax != null ? { max: opts.yMax } : {}),
           title: { display: true, text: opts.yLabel || "값", font: { size: 10 } },
           ticks: {
             font: { size: 10 },
@@ -1253,36 +1255,65 @@ async function reloadBuffettChart(period) {
   const monthlyStartTs = dateToTs("2016-05-15");
   const newStartTs = dateToTs("2021-05-15");
 
+  // 보간 헬퍼: 정렬된 raw 데이터에서 임의 시점 x의 y를 선형 보간
+  function interp(raw, x) {
+    if (raw.length === 0) return null;
+    if (x <= raw[0].x) return raw[0].y;
+    if (x >= raw[raw.length-1].x) return raw[raw.length-1].y;
+    for (let i = 0; i < raw.length-1; i++) {
+      if (raw[i].x <= x && raw[i+1].x >= x) {
+        const tt = (x - raw[i].x) / (raw[i+1].x - raw[i].x || 1);
+        return raw[i].y + (raw[i+1].y - raw[i].y) * tt;
+      }
+    }
+    return raw[raw.length-1].y;
+  }
+
+  // X축 [xMin, xMax]를 균일한 N개 점으로 보간 → 모든 국가가 동일 시점부터 끝점까지 라인
+  const NUM_PTS = 80;
+  function uniformInterp(raw) {
+    if (raw.length === 0) return [];
+    const out = [];
+    for (let i = 0; i <= NUM_PTS; i++) {
+      const t = i / NUM_PTS;
+      const x = xMin + (xMax - xMin) * t;
+      out.push({ x, y: interp(raw, x) });
+    }
+    return out;
+  }
+
   // 기존 120개월 (US/KR/JP) + FRED 연간 prepend
   function buildExisting(code, monthlyData) {
-    const xy = [];
+    const raw = [];
     if (FRED_BUFFETT_LIVE[code]) {
       FRED_BUFFETT_LIVE[code].forEach(p => {
         const ts = dateToTs(p.date);
-        if (ts < monthlyStartTs && ts >= xMin) xy.push({ x: ts, y: p.value });
+        if (ts < monthlyStartTs) raw.push({ x: ts, y: p.value });
       });
     }
     MACRO_MONTHS.forEach((m, i) => {
       const ts = dateToTs(m + "-15");
-      if (monthlyData[i] != null && ts >= xMin && ts <= xMax) xy.push({ x: ts, y: monthlyData[i] });
+      if (monthlyData[i] != null) raw.push({ x: ts, y: monthlyData[i] });
     });
-    return xy.sort((a,b) => a.x - b.x);
+    raw.sort((a,b) => a.x - b.x);
+    return uniformInterp(raw);
   }
-  // 신규 4개국 60개월 + FRED 연간 prepend (TW는 FRED 없음)
+  // 신규 4개국 60개월 + FRED 연간 prepend (TW는 FRED 없음, 5년치 정적만)
   function buildNew(code) {
-    const xy = [];
+    const raw = [];
     if (FRED_BUFFETT_LIVE[code]) {
       FRED_BUFFETT_LIVE[code].forEach(p => {
         const ts = dateToTs(p.date);
-        if (ts < newStartTs && ts >= xMin) xy.push({ x: ts, y: p.value });
+        if (ts < newStartTs) raw.push({ x: ts, y: p.value });
       });
     }
     const tail60 = MACRO_MONTHS.slice(-60);
     BUFFETT_NEW[code].forEach((v, i) => {
       const ts = dateToTs(tail60[i] + "-15");
-      if (v != null && ts >= xMin && ts <= xMax) xy.push({ x: ts, y: v });
+      if (v != null) raw.push({ x: ts, y: v });
     });
-    return xy.sort((a,b) => a.x - b.x);
+    raw.sort((a,b) => a.x - b.x);
+    return uniformInterp(raw);
   }
 
   drawChart("buffett-chart", [
@@ -1294,7 +1325,7 @@ async function reloadBuffettChart(period) {
     { label: "🇬🇧 (FTSE/GDP)", data: buildNew("UK"), borderColor: "#1d4ed8", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
     { label: "🇫🇷 (CAC/GDP)", data: buildNew("FR"), borderColor: "#9333ea", backgroundColor: "transparent", tension: 0.25, pointRadius: 0, borderWidth: 2 },
     { label: "120% 고평가 경계", data: [{x:xMin,y:120},{x:xMax,y:120}], borderColor: "#fb923c", borderDash: [4,4], backgroundColor: "transparent", tension: 0, pointRadius: 0, borderWidth: 1 },
-  ], `버핏 지수 (시가총액/GDP)`, { yLabel: "%", monthLabel: period !== "1y", xMin, xMax });
+  ], `버핏 지수 (시가총액/GDP)`, { yLabel: "%", monthLabel: period !== "1y", xMin, xMax, yMin: 0 });
 }
 
 const RELOADERS = {
@@ -1515,33 +1546,4 @@ async function init() {
     // 채권 카드 다시 그리기 (isLive 배지 갱신)
     document.getElementById("bond-grid").innerHTML = BONDS_10Y.map((b, i) => buildBondCard(b, i)).join("");
     setupBondClicks();
-    console.log(`[fred] ${fredLiveCount}/4 countries updated live`);
-  }
-
-  // 美 10Y 카드를 ^TNX 라이브 데이터로 갱신 (다른 국가는 라이브 소스 없음 → 정적 유지)
-  const tnxData = histCache["^TNX:1mo:1d"];
-  if (tnxData && tnxData.closes && tnxData.closes.length >= 2) {
-    const closes = tnxData.closes;
-    const last = closes[closes.length - 1];
-    const prev = closes[closes.length - 2];
-    const first = closes[0];
-    BONDS_10Y[0].yield = last;
-    BONDS_10Y[0].dPP = last - prev;
-    BONDS_10Y[0].mPP = last - first;
-    BONDS_10Y[0].isLive = true;
-    document.getElementById("bond-grid").innerHTML = BONDS_10Y.map((b, i) => buildBondCard(b, i)).join("");
-    setupBondClicks();
-  }
-
-  tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
-  tag.className = "source-tag live";
-  debugEl.textContent = "";
-}
-
-init().catch(err => {
-  document.getElementById("debug").textContent = "초기화 오류: " + (err && err.message ? err.message : err);
-  console.error(err);
-});
-</script>
-</body>
-</html>
+    con
