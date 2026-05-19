@@ -1546,4 +1546,33 @@ async function init() {
     // 채권 카드 다시 그리기 (isLive 배지 갱신)
     document.getElementById("bond-grid").innerHTML = BONDS_10Y.map((b, i) => buildBondCard(b, i)).join("");
     setupBondClicks();
-    con
+    console.log(`[fred] ${fredLiveCount}/4 countries updated live`);
+  }
+
+  // 美 10Y 카드를 ^TNX 라이브 데이터로 갱신
+  const tnxData = histCache["^TNX:1mo:1d"];
+  if (tnxData && tnxData.closes && tnxData.closes.length >= 2) {
+    const closes = tnxData.closes;
+    const last = closes[closes.length - 1];
+    const prev = closes[closes.length - 2];
+    const first = closes[0];
+    BONDS_10Y[0].yield = last;
+    BONDS_10Y[0].dPP = last - prev;
+    BONDS_10Y[0].mPP = last - first;
+    BONDS_10Y[0].isLive = true;
+    document.getElementById("bond-grid").innerHTML = BONDS_10Y.map((b, i) => buildBondCard(b, i)).join("");
+    setupBondClicks();
+  }
+
+  tag.textContent = `실시간 (${new Date().toLocaleTimeString("ko-KR")})`;
+  tag.className = "source-tag live";
+  debugEl.textContent = "";
+}
+
+init().catch(err => {
+  document.getElementById("debug").textContent = "초기화 오류: " + (err && err.message ? err.message : err);
+  console.error(err);
+});
+</script>
+</body>
+</html>
